@@ -14,9 +14,12 @@ export class ControladorInterfaz {
     }
 
     iniciar() {
+        window.controladorApp = this;
         this.configurarAsistenteSueldoBicanal();
         this.configurarFormularioCompraLugar();
         this.configurarNavegacionPestanas();
+        this.configurarNavegacionMovilYFab();
+        this.configurarCopiaSeguridadJSON();
         this.configurarModalFormulario();
         this.configurarFiltrosYAcciones();
         this.actualizarVistaCompleta();
@@ -164,31 +167,127 @@ export class ControladorInterfaz {
         }
     }
 
-    configurarNavegacionPestanas() {
+    cambiarPestanaActiva(destinoId) {
         const botonesPestanas = document.querySelectorAll('.boton-pestana');
+        const botonesMoviles = document.querySelectorAll('.item-navegacion-movil');
         const paneles = document.querySelectorAll('.panel-contenido');
 
+        botonesPestanas.forEach(b => {
+            if (b.getAttribute('data-pestana') === destinoId) {
+                b.classList.add('activa');
+            } else {
+                b.classList.remove('activa');
+            }
+        });
+
+        botonesMoviles.forEach(b => {
+            if (b.getAttribute('data-pestana') === destinoId) {
+                b.classList.add('activa');
+            } else {
+                b.classList.remove('activa');
+            }
+        });
+
+        paneles.forEach(p => p.classList.remove('activo'));
+        const panelDestino = document.getElementById(destinoId);
+        if (panelDestino) {
+            panelDestino.classList.add('activo');
+        }
+
+        if (destinoId === 'panel-graficos') {
+            this.renderizarGraficos();
+        } else if (destinoId === 'panel-lugares') {
+            this.renderizarSobresPresupuesto();
+            this.renderizarHistorialTransacciones();
+        }
+    }
+
+    configurarNavegacionPestanas() {
+        const botonesPestanas = document.querySelectorAll('.boton-pestana');
         botonesPestanas.forEach(boton => {
             boton.addEventListener('click', () => {
                 const destinoId = boton.getAttribute('data-pestana');
+                this.cambiarPestanaActiva(destinoId);
+            });
+        });
+    }
 
-                botonesPestanas.forEach(b => b.classList.remove('activa'));
-                paneles.forEach(p => p.classList.remove('activo'));
-
-                boton.classList.add('activa');
-                const panelDestino = document.getElementById(destinoId);
-                if (panelDestino) {
-                    panelDestino.classList.add('activo');
-                }
-
-                if (destinoId === 'panel-graficos') {
-                    this.renderizarGraficos();
-                } else if (destinoId === 'panel-lugares') {
-                    this.renderizarSobresPresupuesto();
-                    this.renderizarHistorialTransacciones();
+    configurarNavegacionMovilYFab() {
+        const botonesMoviles = document.querySelectorAll('.item-navegacion-movil');
+        botonesMoviles.forEach(boton => {
+            boton.addEventListener('click', () => {
+                const destinoId = boton.getAttribute('data-pestana');
+                this.cambiarPestanaActiva(destinoId);
+                const panel = document.getElementById(destinoId);
+                if (panel) {
+                    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             });
         });
+
+        const botonFab = document.getElementById('boton-flotante-agregar-gasto');
+        if (botonFab) {
+            botonFab.addEventListener('click', () => {
+                this.cambiarPestanaActiva('panel-lugares');
+                const formCompra = document.getElementById('formulario-compra-lugar');
+                if (formCompra) {
+                    formCompra.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    const inputImporte = document.getElementById('input-importe-compra');
+                    if (inputImporte) {
+                        setTimeout(() => inputImporte.focus(), 300);
+                    }
+                }
+            });
+        }
+    }
+
+    configurarCopiaSeguridadJSON() {
+        const botonExportar = document.getElementById('boton-exportar-backup');
+        const botonImportar = document.getElementById('boton-importar-backup');
+        const inputArchivo = document.getElementById('input-archivo-backup');
+
+        if (botonExportar) {
+            botonExportar.addEventListener('click', () => {
+                const datosJSON = this.gestor.exportarCopiaSeguridadJSON();
+                const blob = new Blob([datosJSON], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const enlaceDescarga = document.createElement('a');
+                const fecha = new Date().toISOString().split('T')[0];
+                enlaceDescarga.href = url;
+                enlaceDescarga.download = `Mi_Presupuesto_Personal_${fecha}.json`;
+                document.body.appendChild(enlaceDescarga);
+                enlaceDescarga.click();
+                document.body.removeChild(enlaceDescarga);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        if (botonImportar && inputArchivo) {
+            botonImportar.addEventListener('click', () => {
+                inputArchivo.click();
+            });
+
+            inputArchivo.addEventListener('change', (evento) => {
+                const archivo = evento.target.files && evento.target.files[0];
+                if (!archivo) return;
+
+                const lector = new FileReader();
+                lector.onload = (e) => {
+                    const contenido = e.target.result;
+                    const resultado = this.gestor.importarCopiaSeguridadJSON(contenido);
+                    alert(resultado.mensaje);
+                    if (resultado.exito) {
+                        const inputCuenta = document.getElementById('input-sueldo-cuenta');
+                        const inputFisico = document.getElementById('input-sueldo-fisico');
+                        if (inputCuenta) inputCuenta.value = this.gestor.ingresoCuenta;
+                        if (inputFisico) inputFisico.value = this.gestor.ingresoFisico;
+                        this.actualizarVistaCompleta();
+                    }
+                };
+                lector.readAsText(archivo);
+                inputArchivo.value = '';
+            });
+        }
     }
 
     configurarFiltrosYAcciones() {
@@ -451,7 +550,13 @@ export class ControladorInterfaz {
                             <i data-lucide="${cfg.icono}" style="color: ${cfg.color}; width: 18px; height: 18px;"></i>
                             ${cfg.nombre}
                         </span>
-                        <span class="insignia-estado-sobre">${textoEstado}</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="insignia-estado-sobre">${textoEstado}</span>
+                            <button class="boton-rapido-sobre" onclick="window.controladorApp.prepararGastoRapidoSobre('${sobre.categoria}')" title="Anotar compra en este sobre">
+                                <i data-lucide="plus" style="width: 12px; height: 12px;"></i>
+                                <span>+ Gasto</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="cifras-sobre-detalle">
@@ -475,6 +580,22 @@ export class ControladorInterfaz {
                 </div>
             `;
         }).join('');
+    }
+
+    prepararGastoRapidoSobre(claveCategoria) {
+        this.cambiarPestanaActiva('panel-lugares');
+        const selectorCat = document.getElementById('selector-categoria-compra');
+        if (selectorCat) {
+            selectorCat.value = claveCategoria;
+        }
+        const formulario = document.getElementById('formulario-compra-lugar');
+        if (formulario) {
+            formulario.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        const inputImporte = document.getElementById('input-importe-compra');
+        if (inputImporte) {
+            setTimeout(() => inputImporte.focus(), 250);
+        }
     }
 
     renderizarHistorialTransacciones() {

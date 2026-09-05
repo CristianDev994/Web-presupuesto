@@ -435,18 +435,23 @@ export class GestorFinanciero {
     guardarEnAlmacenamientoLocal() {
         try {
             const estadoAGuardar = {
+                version: '2.0.0',
+                ultimaActualizacion: new Date().toISOString(),
                 escenarioActual: this.escenarioActual,
                 ingresoCuenta: this.ingresoCuenta,
                 ingresoFisico: this.ingresoFisico,
                 ingresoMes1: this.ingresoMes1,
                 ingresoMesSiguientes: this.ingresoMesSiguientes,
                 perfilSeleccionado: this.perfilSeleccionado,
+                mesVisualizado: this.mesVisualizado,
                 gastos: this.gastos,
                 transacciones: this.transacciones
             };
             localStorage.setItem('presupuesto_personal_universal', JSON.stringify(estadoAGuardar));
+            return true;
         } catch (error) {
             console.warn('Almacenamiento local no disponible:', error);
+            return false;
         }
     }
 
@@ -461,7 +466,9 @@ export class GestorFinanciero {
                 this.ingresoMes1 = parseFloat(objeto.ingresoMes1) || (this.ingresoCuenta + this.ingresoFisico);
                 this.ingresoMesSiguientes = parseFloat(objeto.ingresoMesSiguientes) || this.ingresoMes1;
                 this.perfilSeleccionado = objeto.perfilSeleccionado || 'VIVIENDO_PADRES';
-                if (Array.isArray(objeto.gastos) && objeto.gastos.length > 0) {
+                this.mesVisualizado = parseInt(objeto.mesVisualizado) || 1;
+                
+                if (Array.isArray(objeto.gastos)) {
                     this.gastos = objeto.gastos;
                 }
                 if (Array.isArray(objeto.transacciones)) {
@@ -473,5 +480,51 @@ export class GestorFinanciero {
             console.warn('Error al leer almacenamiento local:', error);
         }
         return false;
+    }
+
+    exportarCopiaSeguridadJSON() {
+        const datosCompletos = {
+            aplicacion: 'Presupuesto Personal Inteligente Bicanal',
+            fechaExportacion: new Date().toISOString(),
+            ingresoCuenta: this.ingresoCuenta,
+            ingresoFisico: this.ingresoFisico,
+            ingresoMes1: this.ingresoMes1,
+            ingresoMesSiguientes: this.ingresoMesSiguientes,
+            perfilSeleccionado: this.perfilSeleccionado,
+            mesVisualizado: this.mesVisualizado,
+            escenarioActual: this.escenarioActual,
+            gastos: this.gastos,
+            transacciones: this.transacciones
+        };
+        return JSON.stringify(datosCompletos, null, 2);
+    }
+
+    importarCopiaSeguridadJSON(contenidoTextoJSON) {
+        try {
+            const objeto = JSON.parse(contenidoTextoJSON);
+            if (!objeto || typeof objeto !== 'object') {
+                throw new Error('Formato JSON no válido.');
+            }
+
+            this.ingresoCuenta = Math.max(0, parseFloat(objeto.ingresoCuenta) || 0);
+            this.ingresoFisico = Math.max(0, parseFloat(objeto.ingresoFisico) || 0);
+            this.ingresoMes1 = Math.max(0, parseFloat(objeto.ingresoMes1) || (this.ingresoCuenta + this.ingresoFisico));
+            this.ingresoMesSiguientes = Math.max(0, parseFloat(objeto.ingresoMesSiguientes) || this.ingresoMes1);
+            this.perfilSeleccionado = objeto.perfilSeleccionado || 'VIVIENDO_PADRES';
+            this.mesVisualizado = parseInt(objeto.mesVisualizado) || 1;
+            this.escenarioActual = objeto.escenarioActual || 'personalizado';
+
+            if (Array.isArray(objeto.gastos)) {
+                this.gastos = objeto.gastos;
+            }
+            if (Array.isArray(objeto.transacciones)) {
+                this.transacciones = objeto.transacciones;
+            }
+
+            this.guardarEnAlmacenamientoLocal();
+            return { exito: true, mensaje: 'Copia de seguridad restaurada correctamente con todas tus partidas y transacciones.' };
+        } catch (error) {
+            return { exito: false, mensaje: 'No se pudo leer el archivo de copia: ' + error.message };
+        }
     }
 }

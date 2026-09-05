@@ -34,6 +34,12 @@
             </div>
 
             <div class="acciones-cabecera">
+                <!-- Indicador de Guardado Local Seguro -->
+                <div class="insignia-persistencia-local" title="Tus datos se guardan automáticamente en tu navegador (100% privado y offline)">
+                    <i data-lucide="shield-check" style="width: 14px; height: 14px; color: #10b981;"></i>
+                    <span>Guardado local offline</span>
+                </div>
+
                 <!-- Botón Cargar Caso de Ejemplo -->
                 <button id="boton-cargar-ejemplo" class="boton-texto-accion" title="Cargar caso práctico de 1.400€ con análisis de comida y deudas">
                     <i data-lucide="file-text" style="width: 16px; height: 16px; color: #38bdf8;"></i>
@@ -45,6 +51,19 @@
                     <i data-lucide="rotate-ccw" style="width: 16px; height: 16px; color: #f87171;"></i>
                     Nuevo Presupuesto
                 </button>
+
+                <!-- Botón Exportar Copia de Seguridad JSON -->
+                <button id="boton-exportar-backup" class="boton-texto-accion" title="Descargar copia de seguridad en JSON para transferir entre móvil y PC">
+                    <i data-lucide="download" style="width: 15px; height: 15px; color: #a78bfa;"></i>
+                    Copia (.json)
+                </button>
+
+                <!-- Botón Restaurar Copia JSON -->
+                <button id="boton-importar-backup" class="boton-texto-accion" title="Restaurar copia de seguridad desde un archivo JSON">
+                    <i data-lucide="upload" style="width: 15px; height: 15px; color: #fbbf24;"></i>
+                    Restaurar
+                </button>
+                <input type="file" id="input-archivo-backup" accept=".json" style="display: none;">
 
                 <!-- Botón Descargar Excel (.xlsx) -->
                 <button id="boton-exportar-excel" class="boton-excel" title="Descargar archivo Excel con formato profesional y 5 hojas de cálculo">
@@ -75,7 +94,7 @@
                             Dinero en Cuenta Bancaria (€)
                         </label>
                         <div class="envoltorio-input-euro">
-                            <input type="number" id="input-sueldo-cuenta" placeholder="Ej. 1000" min="0" step="10">
+                            <input type="number" id="input-sueldo-cuenta" placeholder="Ej. 1000" min="0" step="10" inputmode="decimal">
                             <span class="simbolo-euro" style="color: #818cf8;">€</span>
                         </div>
                         <span style="font-size: 11px; color: var(--color-texto-apagado);">Nómina formal o transferencias bancarias oficiales</span>
@@ -88,7 +107,7 @@
                             Dinero en Efectivo / Mano (€)
                         </label>
                         <div class="envoltorio-input-euro">
-                            <input type="number" id="input-sueldo-fisico" placeholder="Ej. 400" min="0" step="10">
+                            <input type="number" id="input-sueldo-fisico" placeholder="Ej. 400" min="0" step="10" inputmode="decimal">
                             <span class="simbolo-euro" style="color: #34d399;">€</span>
                         </div>
                         <span style="font-size: 11px; color: var(--color-texto-apagado);">Dinero en mano / B, extras o propinas para consumo</span>
@@ -383,7 +402,7 @@
                         <!-- Campo Importe -->
                         <div class="campo-formulario">
                             <label for="input-importe-compra">Importe (€)</label>
-                            <input type="number" id="input-importe-compra" step="0.01" min="0.01" placeholder="0.00" required>
+                            <input type="number" id="input-importe-compra" step="0.01" min="0.01" placeholder="0.00" inputmode="decimal" required>
                         </div>
 
                         <!-- Campo Categoría -->
@@ -691,7 +710,7 @@
 
                 <div class="campo-formulario">
                     <label for="campo-gasto-importe">Importe (€)</label>
-                    <input type="number" id="campo-gasto-importe" name="importe" step="0.01" min="0.01" placeholder="0.00" required>
+                    <input type="number" id="campo-gasto-importe" name="importe" step="0.01" min="0.01" placeholder="0.00" inputmode="decimal" required>
                 </div>
 
                 <div class="campo-formulario">
@@ -731,6 +750,36 @@
             </form>
         </div>
     </div>
+
+    <!-- BARRA DE NAVEGACIÓN INFERIOR FIJA PARA MÓVIL (ESTILO APP NATIVA) -->
+    <nav id="barra-navegacion-inferior-movil" class="barra-navegacion-inferior-movil">
+        <button class="item-navegacion-movil activa" data-pestana="panel-gastos" title="Partidas de Presupuesto">
+            <i data-lucide="list-checks"></i>
+            <span>Partidas</span>
+        </button>
+        <button class="item-navegacion-movil" data-pestana="panel-lugares" title="Control Diario por Lugares (Sobres)">
+            <i data-lucide="store"></i>
+            <span>Sobres</span>
+        </button>
+        <button class="item-navegacion-movil" data-pestana="panel-canales" title="Cuenta Bancaria vs Efectivo">
+            <i data-lucide="arrow-left-right"></i>
+            <span>Bicanal</span>
+        </button>
+        <button class="item-navegacion-movil" data-pestana="panel-excel" title="Proyección 6 Meses">
+            <i data-lucide="table-2"></i>
+            <span>Proyección</span>
+        </button>
+        <button class="item-navegacion-movil" data-pestana="panel-inversiones" title="Inversiones y APIs Gratuitas">
+            <i data-lucide="trending-up"></i>
+            <span>Inversión</span>
+        </button>
+    </nav>
+
+    <!-- BOTÓN FLOTANTE DE ACCIÓN RÁPIDA (FAB) PARA ANOTAR GASTOS EN MÓVIL -->
+    <button id="boton-flotante-agregar-gasto" class="boton-flotante-accion" title="Anotar gasto rápido en comercio">
+        <i data-lucide="plus"></i>
+        <span class="etiqueta-fab-texto">Gasto</span>
+    </button>
 
     <!-- Script de Inicialización ES Module -->
     <script type="module" src="app.js"></script>
