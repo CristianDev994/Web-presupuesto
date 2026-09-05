@@ -1,11 +1,10 @@
-// Motor de cálculo financiero universal con soporte bicanal (Cuenta vs. Físico / B)
+// Motor de cálculo financiero universal con soporte bicanal y seguimiento de gastos por lugares
 
 import { 
     CANALES_PAGO, 
     CATEGORIAS_GASTO, 
     PERFILES_PRESUPUESTO, 
-    CASO_EJEMPLO_INICIAL,
-    ESTRATEGIAS_CANALIZACION_EFECTIVO 
+    CASO_EJEMPLO_INICIAL 
 } from './datos_iniciales.js';
 
 export class GestorFinanciero {
@@ -17,6 +16,7 @@ export class GestorFinanciero {
         this.ingresoMesSiguientes = 0;
         this.horizonteMeses = 6;
         this.gastos = [];
+        this.transacciones = [];
         this.mesVisualizado = 1;
         this.perfilSeleccionado = 'VIVIENDO_PADRES';
 
@@ -36,6 +36,7 @@ export class GestorFinanciero {
         this.ingresoMes1 = 0;
         this.ingresoMesSiguientes = 0;
         this.gastos = [];
+        this.transacciones = [];
         this.escenarioActual = 'personalizado';
         this.guardarEnAlmacenamientoLocal();
     }
@@ -94,9 +95,11 @@ export class GestorFinanciero {
         if (esOriginalConDeficit) {
             this.escenarioActual = 'ejemplo_original';
             this.gastos = JSON.parse(JSON.stringify(CASO_EJEMPLO_INICIAL.gastosOriginalesConDeficit));
+            this.transacciones = [];
         } else {
             this.escenarioActual = 'ejemplo_optimizado';
             this.gastos = JSON.parse(JSON.stringify(CASO_EJEMPLO_INICIAL.gastosOptimizados));
+            this.transacciones = JSON.parse(JSON.stringify(CASO_EJEMPLO_INICIAL.transaccionesEjemplo || []));
         }
         this.guardarEnAlmacenamientoLocal();
     }
@@ -104,6 +107,93 @@ export class GestorFinanciero {
     obtenerIngresoParaMes(numeroMes) {
         return numeroMes === 1 ? this.ingresoMes1 : this.ingresoMesSiguientes;
     }
+
+    // --- MÉTODOS DE TRANSACCIONES Y SEGUIMIENTO POR LUGAR ---
+
+    registrarTransaccion(datosCompra) {
+        const idUnico = 'trans-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+        const hoy = new Date().toISOString().split('T')[0];
+
+        const nuevaTransaccion = {
+            id: idUnico,
+            fecha: datosCompra.fecha || hoy,
+            lugar: (datosCompra.lugar || 'Comercio / Lugar').trim(),
+            importe: parseFloat(datosCompra.importe) || 0,
+            categoria: datosCompra.categoria || 'VIVIENDA_COMIDA',
+            canal: datosCompra.canal || CANALES_PAGO.FISICO,
+            notas: (datosCompra.notas || '').trim()
+        };
+
+        this.transacciones.unshift(nuevaTransaccion);
+        this.guardarEnAlmacenamientoLocal();
+        return nuevaTransaccion;
+    }
+
+    eliminarTransaccion(idTransaccion) {
+        const indice = this.transacciones.findIndex(t => t.id === idTransaccion);
+        if (indice !== -1) {
+            const eliminada = this.transacciones.splice(indice, 1)[0];
+            this.guardarEnAlmacenamientoLocal();
+            return eliminada;
+        }
+        return null;
+    }
+
+    obtenerSeguimientoSobres() {
+        const resumen = this.calcularResumenMes(this.mesVisualizado);
+        const seguimiento = {};
+
+        Object.keys(CATEGORIAS_GASTO).forEach(clave => {
+            const limitePresupuestado = resumen.desglosePorCategoria[clave] || 0;
+            
+            // Sumar lo gastado real en transacciones para esta categoría
+            const gastosReales = this.transacciones
+                .filter(t => t.categoria === clave)
+                .reduce((acumulado, t) => acumulado + t.importe, 0);
+
+            const dineroGastado = Math.round(gastosReales * 100) / 100;
+            const dineroDisponible = Math.round((limitePresupuestado - dineroGastado) * 100) / 100;
+            const porcentajeConsumido = limitePresupuestado > 0 
+                ? Math.round((dineroGastado / limitePresupuestado) * 100) 
+                : 0;
+
+            let estadoSobre = 'saludable';
+            if (dineroDisponible < 0) {
+                estadoSobre = 'sobregasto';
+            } else if (porcentajeConsumido >= 75) {
+                estadoSobre = 'alerta';
+            }
+
+            seguimiento[clave] = {
+                categoria: clave,
+                configuracion: CATEGORIAS_GASTO[clave],
+                limitePresupuestado,
+                dineroGastado,
+                dineroDisponible,
+                porcentajeConsumido,
+                estadoSobre,
+                dineroSalvadoParaAhorro: Math.max(0, dineroDisponible)
+            };
+        });
+
+        return seguimiento;
+    }
+
+    calcularTotalSalvadoParaAhorro() {
+        const seguimiento = this.obtenerSeguimientoSobres();
+        let totalSalvado = 0;
+
+        // Sumar remanente de categorías de consumo (no incluye lo ya asignado como AHORRO_INVERSION)
+        Object.values(seguimiento).forEach(item => {
+            if (item.categoria !== 'AHORRO_INVERSION') {
+                totalSalvado += item.dineroSalvadoParaAhorro;
+            }
+        });
+
+        return Math.round(totalSalvado * 100) / 100;
+    }
+
+    // --- MÉTODOS DE GASTOS Y RESÚMENES ---
 
     agregarGasto(nuevoGasto) {
         const identificadorUnico = 'gasto-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
@@ -218,7 +308,6 @@ export class GestorFinanciero {
         const balanceNeto = ingresoActual - totalPresupuestadoCompleto;
         const sobranteConsumo = ingresoActual - totalGastosConsumo;
 
-        // Diagnóstico de Absorción de Efectivo Físico / B
         const analisisEfectivo = this.analizarFlujoEfectivo(totalFisico);
 
         let estadoSalud = 'optimo';
@@ -279,17 +368,14 @@ export class GestorFinanciero {
         let recomendacion = '';
 
         if (dineroManoIngresado === 0) {
-            // No ingresa dinero en B; todo sale de la cuenta y se retira en cajero si procede
             situacion = 'retirada_cajero';
             recomendacion = `Retira ${gastosConsumoFisico.toFixed(2)}€ del cajero al principio de mes para llevar en billetes físicos.`;
         } else if (dineroManoIngresado <= gastosConsumoFisico) {
-            // Situación ideal: el 100% del efectivo en B se consume en compras normales sin tocar cajeros
             situacion = 'absorcion_completa';
             dineroLiberadoParaInvertir = dineroManoIngresado;
             const diferenciaARetirar = gastosConsumoFisico - dineroManoIngresado;
             recomendacion = `¡Absorción perfecta! Tus ${dineroManoIngresado.toFixed(2)}€ en mano cubren parte de tu consumo diario (supermercado, ocio, gasolina). Solo necesitas sacar ${diferenciaARetirar.toFixed(2)}€ del cajero. Has liberado ${dineroLiberadoParaInvertir.toFixed(2)}€ limpios en tu cuenta bancaria para inversión o ahorro.`;
         } else {
-            // El dinero en B supera los gastos físicos habituales
             situacion = 'excedente_efectivo';
             dineroLiberadoParaInvertir = gastosConsumoFisico;
             dineroSobranteEnMano = dineroManoIngresado - gastosConsumoFisico;
@@ -355,7 +441,8 @@ export class GestorFinanciero {
                 ingresoMes1: this.ingresoMes1,
                 ingresoMesSiguientes: this.ingresoMesSiguientes,
                 perfilSeleccionado: this.perfilSeleccionado,
-                gastos: this.gastos
+                gastos: this.gastos,
+                transacciones: this.transacciones
             };
             localStorage.setItem('presupuesto_personal_universal', JSON.stringify(estadoAGuardar));
         } catch (error) {
@@ -376,8 +463,11 @@ export class GestorFinanciero {
                 this.perfilSeleccionado = objeto.perfilSeleccionado || 'VIVIENDO_PADRES';
                 if (Array.isArray(objeto.gastos) && objeto.gastos.length > 0) {
                     this.gastos = objeto.gastos;
-                    return true;
                 }
+                if (Array.isArray(objeto.transacciones)) {
+                    this.transacciones = objeto.transacciones;
+                }
+                return true;
             }
         } catch (error) {
             console.warn('Error al leer almacenamiento local:', error);

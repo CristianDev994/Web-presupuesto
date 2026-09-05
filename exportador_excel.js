@@ -1,4 +1,4 @@
-// Exportador profesional a Excel (.xlsx) adaptable a cualquier presupuesto e ingreso neto
+// Exportador profesional a Excel (.xlsx) con 5 hojas incluyendo registro de compras por lugares
 
 export class ExportadorExcel {
     constructor(gestorFinanciero) {
@@ -17,21 +17,75 @@ export class ExportadorExcel {
         const hojaProyeccion = this.construirHojaProyeccion();
         XLSX.utils.book_append_sheet(libroTrabajo, hojaProyeccion, 'Presupuesto_6_Meses');
 
-        // 2. Hoja: Cuenta Bancaria vs. Efectivo Físico
+        // 2. Hoja: Control Diario por Lugares y Sobres Digitales
+        const hojaLugares = this.construirHojaComprasLugares();
+        XLSX.utils.book_append_sheet(libroTrabajo, hojaLugares, 'Gastos_Por_Lugares');
+
+        // 3. Hoja: Cuenta Bancaria vs. Efectivo Físico
         const hojaCanales = this.construirHojaCanalesPago();
         XLSX.utils.book_append_sheet(libroTrabajo, hojaCanales, 'Cuenta_vs_Fisico');
 
-        // 3. Hoja: Catálogo Completo de Gastos y Partidas
+        // 4. Hoja: Catálogo Completo de Partidas
         const hojaDesglose = this.construirHojaDesgloseGastos();
         XLSX.utils.book_append_sheet(libroTrabajo, hojaDesglose, 'Desglose_Partidas');
 
-        // 4. Hoja: Diagnóstico y Salud Financiera
+        // 5. Hoja: Diagnóstico y Salud Financiera
         const hojaDiagnostico = this.construirHojaDiagnostico();
         XLSX.utils.book_append_sheet(libroTrabajo, hojaDiagnostico, 'Salud_Financiera');
 
-        // Descarga directa del archivo .xlsx
         const nombreArchivo = 'Mi_Presupuesto_Personal.xlsx';
         XLSX.writeFile(libroTrabajo, nombreArchivo);
+    }
+
+    construirHojaComprasLugares() {
+        const transacciones = this.gestor.transacciones;
+        const seguimiento = this.gestor.obtenerSeguimientoSobres();
+        const dineroSalvadoTotal = this.gestor.calcularTotalSalvadoParaAhorro();
+
+        const filasDatos = [
+            ['CONTROL DIARIO DE GASTOS POR LUGAR Y SOBRES DIGITALES'],
+            [`Dinero Total No Gastado (Transferido a tu Ahorro): +${dineroSalvadoTotal.toFixed(2)} €`],
+            [],
+            ['1. ESTADO DE SOBRES DIGITALES (PRESUPUESTO DISPONIBLE POR CATEGORÍA)'],
+            ['Categoría', 'Presupuesto Límite (€)', 'Gastado Real (€)', 'Dinero Disponible (€)', 'Consumo %', 'Dinero Salvado para Ahorro (€)']
+        ];
+
+        Object.values(seguimiento).forEach(sobre => {
+            filasDatos.push([
+                sobre.configuracion.nombre,
+                sobre.limitePresupuestado,
+                sobre.dineroGastado,
+                sobre.dineroDisponible,
+                `${sobre.porcentajeConsumido}%`,
+                sobre.dineroSalvadoParaAhorro
+            ]);
+        });
+
+        filasDatos.push([]);
+        filasDatos.push(['2. HISTORIAL DE GASTOS REGISTRADOS EN COMERCIOS Y LUGARES']);
+        filasDatos.push(['ID', 'Fecha', 'Lugar / Establecimiento', 'Categoría', 'Canal de Pago', 'Importe (€)', 'Notas']);
+
+        if (transacciones.length === 0) {
+            filasDatos.push(['-', '-', 'Sin compras registradas aún', '-', '-', 0, '-']);
+        } else {
+            transacciones.forEach(t => {
+                filasDatos.push([
+                    t.id,
+                    t.fecha,
+                    t.lugar,
+                    t.categoria,
+                    t.canal,
+                    t.importe,
+                    t.notas || ''
+                ]);
+            });
+        }
+
+        const hoja = XLSX.utils.aoa_to_sheet(filasDatos);
+        hoja['!cols'] = [
+            { wch: 18 }, { wch: 14 }, { wch: 32 }, { wch: 28 }, { wch: 22 }, { wch: 16 }, { wch: 35 }
+        ];
+        return hoja;
     }
 
     construirHojaProyeccion() {
@@ -116,7 +170,7 @@ export class ExportadorExcel {
             ['PLAN OPERATIVO: CUENTA BANCARIA VS. EFECTIVO FÍSICO'],
             [`Ingreso mensual neto considerado: ${resumenMes1.ingresoActual.toFixed(2)} €`],
             [],
-            ['1. DINERO A RETIRAR EN EL CAJERO AUTOMÁTICO (EFECTIVO EN MANO)'],
+            ['1. DINERO EN EFECTIVO FÍSICO (EN MANO / B / CAJERO)'],
             ['Concepto', 'Categoría', 'Importe (€)', 'Finalidad y Recomendación']
         ];
 
@@ -131,7 +185,7 @@ export class ExportadorExcel {
             ]);
         });
 
-        filasDatos.push(['TOTAL A RETIRAR EN CAJERO', '', subtotalFisico, 'Retirar a principio de mes en billetes']);
+        filasDatos.push(['TOTAL GASTOS EN EFECTIVO', '', subtotalFisico, 'Consumo en billetes físicos']);
         filasDatos.push([]);
         filasDatos.push(['2. DINERO A MANTENER INTACTO EN LA CUENTA BANCARIA']);
         filasDatos.push(['Concepto', 'Categoría', 'Importe (€)', 'Finalidad y Cobro']);
@@ -151,7 +205,7 @@ export class ExportadorExcel {
         filasDatos.push([]);
         filasDatos.push(['3. RESUMEN GLOBAL DE DISTRIBUCIÓN']);
         filasDatos.push(['Destino Financiero', 'Medio', 'Importe (€)', 'Instrucción Operativa']);
-        filasDatos.push(['Gastos en Efectivo Físico', 'Cajero', subtotalFisico, 'Llevar en cartera / sobres']);
+        filasDatos.push(['Gastos en Efectivo Físico', 'Mano / Cajero', subtotalFisico, 'Llevar en cartera / sobres']);
         filasDatos.push(['Gastos en Cuenta Bancaria', 'Banco', subtotalCuenta, 'Dejar para recibos automáticos']);
         filasDatos.push(['Ahorro Líquido Asignado', 'Cuenta Remunerada', resumenMes1.totalAhorroAsignado, 'Fondo de seguridad / emergencia']);
         filasDatos.push(['Inversión a Largo Plazo', 'Bróker / Fondos', resumenMes1.totalInversionAsignada, 'Construcción de patrimonio compuesto']);
@@ -197,7 +251,7 @@ export class ExportadorExcel {
             ['Métrica Financiera', 'Valor Calculado', 'Evaluación / Recomendación'],
             ['Ingreso Neto Mensual', `${resumen.ingresoActual.toFixed(2)} €`, 'Base de cálculo disponible'],
             ['Gastos de Consumo Totales', `${resumen.totalGastosConsumo.toFixed(2)} €`, 'Total destinado a gastos corrientes'],
-            ['Total en Efectivo (Cajero)', `${resumen.totalFisico.toFixed(2)} €`, 'Retirada para evitar compras impulsivas'],
+            ['Total en Efectivo (Cajero/Mano)', `${resumen.totalFisico.toFixed(2)} €`, 'Consumo en billetes físicos'],
             ['Total en Cuenta (Banco)', `${resumen.totalCuenta.toFixed(2)} €`, 'Reservado para domiciliaciones y suscripciones'],
             ['Ahorro Líquido Mensual', `${resumen.totalAhorroAsignado.toFixed(2)} €`, 'Fondo de emergencia intocable'],
             ['Inversión a Largo Plazo', `${resumen.totalInversionAsignada.toFixed(2)} €`, 'Aportación a fondos indexados'],

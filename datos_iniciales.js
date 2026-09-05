@@ -1,4 +1,4 @@
-// Constantes, perfiles presupuestarios, estrategias de efectivo y APIs de inversión
+// Constantes, perfiles presupuestarios, estrategias de efectivo, lugares y APIs de inversión
 
 export const CANALES_PAGO = {
     CUENTA: 'Cuenta Bancaria',
@@ -13,6 +13,25 @@ export const CATEGORIAS_GASTO = {
     PREVISION_RESERVAS: { nombre: 'Previsión de Recibos / Fondo', icono: 'calendar-check', color: '#8b5cf6' },
     AHORRO_INVERSION: { nombre: 'Ahorro e Inversión', icono: 'trending-up', color: '#06b6d4' }
 };
+
+// Sugerencias de lugares y comercios habituales para autocompletado rápido
+export const LUGARES_FRECUENTES_SUGERIDOS = [
+    'Mercadona',
+    'Carrefour',
+    'Lidl',
+    'Supermercado Día',
+    'Gasolinera Repsol',
+    'Gasolinera Cepsa',
+    'Bar de Tapas / Cerveza',
+    'Restaurante Cena',
+    'Botellón / Copas Feria',
+    'Amazon',
+    'Farmacia',
+    'Peluquería',
+    'Zara / Tienda de Ropa',
+    'Panadería / Frutería local',
+    'Aportación en mano a Padres'
+];
 
 // Pautas financieras para canalizar el efectivo en mano sin perder por inflación ni alertar a bancos
 export const ESTRATEGIAS_CANALIZACION_EFECTIVO = {
@@ -129,5 +148,10 @@ export const CASO_EJEMPLO_INICIAL = {
         { id: 'ejemplo-7', concepto: 'Deuda general pendiente', importe: 140.00, categoria: 'DEUDAS_OBLIGACIONES', canal: CANALES_PAGO.CUENTA, esencial: true, recurrente: false, mesFiniquito: 1, descripcion: 'Liquidada en Mes 1' },
         { id: 'ejemplo-8', concepto: 'Deuda FL Studio', importe: 40.00, categoria: 'DEUDAS_OBLIGACIONES', canal: CANALES_PAGO.CUENTA, esencial: true, recurrente: false, mesFiniquito: 1, descripcion: 'Liquidada en Mes 1' },
         { id: 'ejemplo-9', concepto: 'Reserva para recibo próximo mes', importe: 50.00, categoria: 'PREVISION_RESERVAS', canal: CANALES_PAGO.CUENTA, esencial: true, recurrente: false, mesFiniquito: 1, descripcion: 'Apartado para Mes 2' }
+    ],
+    transaccionesEjemplo: [
+        { id: 'trans-ejemplo-1', fecha: '2026-09-02', lugar: 'Mercadona', importe: 42.50, categoria: 'VIVIENDA_COMIDA', canal: CANALES_PAGO.FISICO, notas: 'Compra semanal de comida fresca' },
+        { id: 'trans-ejemplo-2', fecha: '2026-09-03', lugar: 'Bar de Tapas / Cerveza', importe: 18.00, categoria: 'OCIO_ESTILO_VIDA', canal: CANALES_PAGO.FISICO, notas: 'Salida con amigos tarde de viernes' },
+        { id: 'trans-ejemplo-3', fecha: '2026-09-04', lugar: 'Suscripción ChatGPT Plus', importe: 20.00, categoria: 'DIGITAL_SUSCRIPCIONES', canal: CANALES_PAGO.CUENTA, notas: 'Cargo automático en tarjeta virtual' }
     ]
 };

@@ -1,6 +1,6 @@
-// Controlador principal de la interfaz de usuario con soporte bicanal y asesor de efectivo
+// Controlador principal de la interfaz de usuario con soporte bicanal y seguimiento de gastos por lugares
 
-import { CANALES_PAGO, CATEGORIAS_GASTO, PERFILES_PRESUPUESTO } from './datos_iniciales.js';
+import { CANALES_PAGO, CATEGORIAS_GASTO, PERFILES_PRESUPUESTO, LUGARES_FRECUENTES_SUGERIDOS } from './datos_iniciales.js';
 import { GestorFinanciero } from './gestor_financiero.js';
 import { ExportadorExcel } from './exportador_excel.js';
 
@@ -15,6 +15,7 @@ export class ControladorInterfaz {
 
     iniciar() {
         this.configurarAsistenteSueldoBicanal();
+        this.configurarFormularioCompraLugar();
         this.configurarNavegacionPestanas();
         this.configurarModalFormulario();
         this.configurarFiltrosYAcciones();
@@ -33,7 +34,6 @@ export class ControladorInterfaz {
         const enlaceRapidoEjemplo = document.getElementById('enlace-rapido-ejemplo');
         const botonReiniciar = document.getElementById('boton-reiniciar-limpio');
 
-        // Precargar valores guardados si existen
         if (inputCuenta && this.gestor.ingresoCuenta > 0) {
             inputCuenta.value = this.gestor.ingresoCuenta;
         }
@@ -122,6 +122,48 @@ export class ControladorInterfaz {
         }
     }
 
+    configurarFormularioCompraLugar() {
+        const datalistLugares = document.getElementById('lista-sugerencias-lugares');
+        if (datalistLugares) {
+            datalistLugares.innerHTML = LUGARES_FRECUENTES_SUGERIDOS.map(lugar => `
+                <option value="${lugar}"></option>
+            `).join('');
+        }
+
+        const formulario = document.getElementById('formulario-compra-lugar');
+        const inputLugar = document.getElementById('input-lugar-compra');
+        const inputImporte = document.getElementById('input-importe-compra');
+        const selectCategoria = document.getElementById('selector-categoria-compra');
+        const selectCanal = document.getElementById('selector-canal-compra');
+
+        if (formulario) {
+            formulario.addEventListener('submit', (evento) => {
+                evento.preventDefault();
+                const lugar = inputLugar.value.trim();
+                const importe = parseFloat(inputImporte.value) || 0;
+                const categoria = selectCategoria.value;
+                const canal = selectCanal.value;
+
+                if (!lugar || importe <= 0) {
+                    alert('Por favor, introduce el lugar o comercio y un importe mayor a 0€');
+                    return;
+                }
+
+                this.gestor.registrarTransaccion({
+                    lugar,
+                    importe,
+                    categoria,
+                    canal,
+                    fecha: new Date().toISOString().split('T')[0]
+                });
+
+                inputLugar.value = '';
+                inputImporte.value = '';
+                this.actualizarVistaCompleta();
+            });
+        }
+    }
+
     configurarNavegacionPestanas() {
         const botonesPestanas = document.querySelectorAll('.boton-pestana');
         const paneles = document.querySelectorAll('.panel-contenido');
@@ -141,6 +183,9 @@ export class ControladorInterfaz {
 
                 if (destinoId === 'panel-graficos') {
                     this.renderizarGraficos();
+                } else if (destinoId === 'panel-lugares') {
+                    this.renderizarSobresPresupuesto();
+                    this.renderizarHistorialTransacciones();
                 }
             });
         });
@@ -279,6 +324,8 @@ export class ControladorInterfaz {
         this.renderizarTablaGastos();
         this.renderizarVistaCanales(resumen);
         this.renderizarTablaProyeccionExcel();
+        this.renderizarSobresPresupuesto();
+        this.renderizarHistorialTransacciones();
 
         const panelGraficos = document.getElementById('panel-graficos');
         if (panelGraficos && panelGraficos.classList.contains('activo')) {
@@ -311,7 +358,7 @@ export class ControladorInterfaz {
             if (resumen.ingresoFisico > 0) {
                 subFisico.textContent = `Absorbe ${Math.min(resumen.ingresoFisico, resumen.totalFisico).toFixed(2)}€ de tu efectivo en mano`;
             } else {
-                subFisico.textContent = 'Retirada para billetes en cartera';
+                subFisico.textContent = 'Consumo en billetes físicos';
             }
         }
 
@@ -361,6 +408,138 @@ export class ControladorInterfaz {
             `;
         } else {
             bloqueEstrategia.style.display = 'none';
+        }
+    }
+
+    renderizarSobresPresupuesto() {
+        const contenedorSobres = document.getElementById('cuerpo-sobres-presupuesto');
+        const valorHucha = document.getElementById('valor-hucha-ahorro-acumulado');
+
+        if (!contenedorSobres) return;
+
+        const seguimiento = this.gestor.obtenerSeguimientoSobres();
+        const dineroSalvadoTotal = this.gestor.calcularTotalSalvadoParaAhorro();
+
+        if (valorHucha) {
+            valorHucha.textContent = `+${dineroSalvadoTotal.toFixed(2)} €`;
+        }
+
+        const categoriasValidas = Object.values(seguimiento).filter(s => s.limitePresupuestado > 0 || s.dineroGastado > 0);
+
+        if (categoriasValidas.length === 0) {
+            contenedorSobres.innerHTML = `
+                <div style="grid-column: 1 / -1; text-align: center; padding: 30px; color: var(--color-texto-apagado);">
+                    Configura tu presupuesto arriba para activar tus sobres digitales de gasto.
+                </div>
+            `;
+            return;
+        }
+
+        contenedorSobres.innerHTML = categoriasValidas.map(sobre => {
+            const cfg = sobre.configuracion;
+            const claseEstado = `sobre-${sobre.estadoSobre}`;
+            let textoEstado = 'Dentro de límite';
+            if (sobre.estadoSobre === 'alerta') textoEstado = 'Atención (75%)';
+            if (sobre.estadoSobre === 'sobregasto') textoEstado = '¡Excedido!';
+
+            const anchoBarra = Math.min(100, sobre.porcentajeConsumido);
+
+            return `
+                <div class="tarjeta-sobre-categoria ${claseEstado}">
+                    <div class="cabecera-sobre">
+                        <span class="nombre-sobre">
+                            <i data-lucide="${cfg.icono}" style="color: ${cfg.color}; width: 18px; height: 18px;"></i>
+                            ${cfg.nombre}
+                        </span>
+                        <span class="insignia-estado-sobre">${textoEstado}</span>
+                    </div>
+
+                    <div class="cifras-sobre-detalle">
+                        <span class="disponible-etiqueta">Te queda disponible:</span>
+                        <span class="disponible-valor">${sobre.dineroDisponible.toFixed(2)} €</span>
+                    </div>
+
+                    <div class="gastado-vs-limite">
+                        <span>Gastado: <strong>${sobre.dineroGastado.toFixed(2)} €</strong></span>
+                        <span>Presupuestado: ${sobre.limitePresupuestado.toFixed(2)} €</span>
+                    </div>
+
+                    <div class="barra-progreso-sobre">
+                        <div class="relleno-barra-sobre" style="width: ${anchoBarra}%;"></div>
+                    </div>
+
+                    <div class="pie-sobre-salvado">
+                        <span>Consumo: ${sobre.porcentajeConsumido}%</span>
+                        <span style="color: #34d399;">Salvado para ahorro: +${sobre.dineroSalvadoParaAhorro.toFixed(2)} €</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    renderizarHistorialTransacciones() {
+        const cuerpoHistorial = document.getElementById('cuerpo-historial-transacciones');
+        const contadorTransacciones = document.getElementById('contador-transacciones-registradas');
+
+        if (!cuerpoHistorial) return;
+
+        const transacciones = this.gestor.transacciones;
+
+        if (contadorTransacciones) {
+            contadorTransacciones.textContent = `${transacciones.length} compras / gastos registrados`;
+        }
+
+        if (transacciones.length === 0) {
+            cuerpoHistorial.innerHTML = `
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 24px; color: var(--color-texto-apagado);">
+                        No hay compras registradas aún. ¡Anota arriba tu primer gasto en Mercadona, Gasolinera, Bar, etc.!
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        cuerpoHistorial.innerHTML = transacciones.map(t => {
+            const cfg = CATEGORIAS_GASTO[t.categoria] || { nombre: t.categoria, color: '#94a3b8' };
+            const esCuenta = t.canal === CANALES_PAGO.CUENTA;
+
+            return `
+                <tr>
+                    <td style="color: var(--color-texto-apagado); font-size: 13px;">${t.fecha}</td>
+                    <td>
+                        <span class="etiqueta-lugar">
+                            <i data-lucide="store" style="width: 14px; height: 14px; color: #38bdf8;"></i>
+                            ${t.lugar}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="insignia-categoria" style="border-left: 3px solid ${cfg.color}">
+                            ${cfg.nombre}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="etiqueta-canal ${esCuenta ? 'canal-cuenta' : 'canal-fisico'}" style="cursor: default; padding: 4px 8px; font-size: 11px;">
+                            ${t.canal}
+                        </span>
+                    </td>
+                    <td style="font-family: var(--fuente-titulos); font-weight: 700; color: #ffffff;">
+                        ${t.importe.toFixed(2)} €
+                    </td>
+                    <td>
+                        <button class="boton-icono eliminar" onclick="window.controladorApp.eliminarTransaccion('${t.id}')" title="Eliminar gasto">
+                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    eliminarTransaccion(idTransaccion) {
+        if (confirm('¿Deseas eliminar este gasto del historial? El dinero volverá a estar disponible en su sobre.')) {
+            this.gestor.eliminarTransaccion(idTransaccion);
+            this.actualizarVistaCompleta();
         }
     }
 

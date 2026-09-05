@@ -257,7 +257,6 @@ body {
     max-width: 850px;
 }
 
-/* Rejilla de entradas bicanal (Cuenta vs. Físico / B) */
 .rejilla-entradas-bicanal {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -529,6 +528,286 @@ body {
 }
 
 /* ==========================================================================
+   NUEVA SECCIÓN: CONTROL Y SEGUIMIENTO POR LUGAR (SOBRES DIGITALES)
+   ========================================================================== */
+
+.seccion-control-lugares {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.panel-registro-compra-rapida {
+    background: var(--color-fondo-tarjeta);
+    border: 1px solid var(--color-borde-vidrio);
+    border-radius: var(--radio-borde-lg);
+    padding: 24px 28px;
+    box-shadow: var(--sombra-tarjeta);
+    backdrop-filter: blur(16px);
+}
+
+.cabecera-registro-compra {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.titulo-registro-compra {
+    font-family: var(--fuente-titulos);
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.formulario-compra-lugar {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1.2fr 1.2fr auto;
+    gap: 14px;
+    align-items: flex-end;
+}
+
+@media (max-width: 1100px) {
+    .formulario-compra-lugar {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .formulario-compra-lugar {
+        grid-template-columns: 1fr;
+    }
+}
+
+.boton-anotar-gasto {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+    border: 1px solid rgba(6, 182, 212, 0.4);
+    border-radius: var(--radio-borde-sm);
+    color: #ffffff;
+    font-family: var(--fuente-titulos);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
+    transition: var(--transicion-suave);
+    height: 44px;
+    white-space: nowrap;
+}
+
+.boton-anotar-gasto:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(6, 182, 212, 0.45);
+}
+
+/* Tarjeta Destacada: Dinero Salvado para Ahorro */
+.tarjeta-hucha-ahorro {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.1) 100%);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    border-radius: var(--radio-borde-lg);
+    padding: 22px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 10px 30px rgba(16, 185, 129, 0.15);
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.contenido-hucha h3 {
+    font-family: var(--fuente-titulos);
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.contenido-hucha p {
+    font-size: 13px;
+    color: var(--color-texto-secundario);
+}
+
+.valor-hucha-destacado {
+    font-family: var(--fuente-titulos);
+    font-size: 32px;
+    font-weight: 800;
+    color: #34d399;
+}
+
+/* Rejilla de Sobres de Presupuesto Disponible */
+.rejilla-sobres-presupuesto {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.tarjeta-sobre-categoria {
+    background: var(--color-fondo-tarjeta);
+    border: 1px solid var(--color-borde-vidrio);
+    border-radius: var(--radio-borde-lg);
+    padding: 22px;
+    backdrop-filter: blur(16px);
+    box-shadow: var(--sombra-tarjeta);
+    transition: var(--transicion-suave);
+    position: relative;
+    overflow: hidden;
+}
+
+.tarjeta-sobre-categoria:hover {
+    transform: translateY(-3px);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.cabecera-sobre {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.nombre-sobre {
+    font-family: var(--fuente-titulos);
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.insignia-estado-sobre {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.sobre-saludable .insignia-estado-sobre {
+    background: var(--color-esmeralda-brillo);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.sobre-alerta .insignia-estado-sobre {
+    background: var(--color-ambar-brillo);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.sobre-sobregasto .insignia-estado-sobre {
+    background: var(--color-rojo-brillo);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.cifras-sobre-detalle {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+}
+
+.disponible-etiqueta {
+    font-size: 12px;
+    color: var(--color-texto-apagado);
+    text-transform: uppercase;
+}
+
+.disponible-valor {
+    font-family: var(--fuente-titulos);
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.sobre-saludable .disponible-valor { color: #34d399; }
+.sobre-alerta .disponible-valor { color: #fbbf24; }
+.sobre-sobregasto .disponible-valor { color: #f87171; }
+
+.gastado-vs-limite {
+    font-size: 12px;
+    color: var(--color-texto-secundario);
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.barra-progreso-sobre {
+    width: 100%;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.relleno-barra-sobre {
+    height: 100%;
+    transition: width 0.4s ease;
+}
+
+.sobre-saludable .relleno-barra-sobre { background: #10b981; }
+.sobre-alerta .relleno-barra-sobre { background: #f59e0b; }
+.sobre-sobregasto .relleno-barra-sobre { background: #ef4444; }
+
+.pie-sobre-salvado {
+    font-size: 12px;
+    color: var(--color-texto-apagado);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 8px;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Historial de Transacciones */
+.contenedor-historial-compras {
+    background: var(--color-fondo-tarjeta);
+    border: 1px solid var(--color-borde-vidrio);
+    border-radius: var(--radio-borde-lg);
+    box-shadow: var(--sombra-tarjeta);
+    overflow: hidden;
+    backdrop-filter: blur(16px);
+}
+
+.cabecera-historial-compras {
+    padding: 18px 24px;
+    background: rgba(14, 19, 31, 0.9);
+    border-bottom: 1px solid var(--color-borde-vidrio);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.titulo-historial {
+    font-family: var(--fuente-titulos);
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.etiqueta-lugar {
+    font-weight: 600;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ==========================================================================
    BARRA VISUAL DE DISTRIBUCIÓN DEL SUELDO (100%)
    ========================================================================== */
 
@@ -776,7 +1055,7 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 22px;
+    padding: 12px 20px;
     background: transparent;
     border: none;
     border-radius: var(--radio-borde-md);
@@ -1425,4 +1704,5 @@ body {
     .rejilla-metricas { grid-template-columns: 1fr; }
     .tarjeta-asistente-inicial { padding: 22px 20px; }
     .tabla-datos th, .tabla-datos td { padding: 12px 10px; font-size: 13px; }
+    .tarjeta-hucha-ahorro { flex-direction: column; align-items: flex-start; }
 }

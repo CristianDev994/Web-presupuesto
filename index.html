@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Presupuesto Personal Inteligente | Calculadora Automática Bicanal</title>
-    <meta name="description" content="Calculadora de presupuesto personal bicanal (Cuenta Bancaria vs. Efectivo Físico/B), estrategia anti-inflación, APIs de inversión y exportador a Excel (.xlsx).">
+    <meta name="description" content="Calculadora de presupuesto personal bicanal (Cuenta Bancaria vs. Efectivo Físico/B), control diario de gastos por lugar, estrategia anti-inflación y exportador a Excel (.xlsx).">
     
     <!-- Estilos de Diseño Dark Luxury Glassmorphism -->
     <link rel="stylesheet" href="estilos.css">
@@ -26,7 +26,7 @@
                 <div>
                     <h1 class="titulo-aplicacion">Presupuesto Personal Inteligente</h1>
                     <div class="subtitulo-aplicacion">
-                        <span>Control Bicanal: Cuenta y Efectivo</span>
+                        <span>Control Bicanal y Gastos por Lugar</span>
                         <span>•</span>
                         <span id="insignia-estado-actual" class="insignia-estado insignia-neutra">Sin Configurar</span>
                     </div>
@@ -47,7 +47,7 @@
                 </button>
 
                 <!-- Botón Descargar Excel (.xlsx) -->
-                <button id="boton-exportar-excel" class="boton-excel" title="Descargar archivo Excel con formato profesional y 4 hojas de cálculo">
+                <button id="boton-exportar-excel" class="boton-excel" title="Descargar archivo Excel con formato profesional y 5 hojas de cálculo">
                     <i data-lucide="file-spreadsheet" style="width: 18px; height: 18px;"></i>
                     Exportar a Excel (.xlsx)
                 </button>
@@ -272,6 +272,10 @@
                 <i data-lucide="list-checks" style="width: 18px; height: 18px;"></i>
                 Gestión y Cuadre de Partidas
             </button>
+            <button class="boton-pestana" data-pestana="panel-lugares">
+                <i data-lucide="store" style="width: 18px; height: 18px; color: #06b6d4;"></i>
+                Control Diario por Lugares (Sobres)
+            </button>
             <button class="boton-pestana" data-pestana="panel-canales">
                 <i data-lucide="arrow-left-right" style="width: 18px; height: 18px;"></i>
                 Cuenta Bancaria vs. Efectivo Físico
@@ -336,7 +340,125 @@
             </div>
         </div>
 
-        <!-- PESTAÑA 2: CUENTA BANCARIA VS. EFECTIVO FÍSICO -->
+        <!-- PESTAÑA 2: NUEVO APARTADO - CONTROL DIARIO POR LUGARES (SISTEMA DE SOBRES DIGITALES) -->
+        <div id="panel-lugares" class="panel-contenido">
+            <div class="seccion-control-lugares">
+
+                <!-- Tarjeta Hucha de Dinero Salvado para Ahorro -->
+                <div class="tarjeta-hucha-ahorro">
+                    <div class="contenido-hucha">
+                        <h3>
+                            <i data-lucide="piggy-bank" style="color: #34d399; width: 24px; height: 24px;"></i>
+                            Dinero Disponible que se Transfiere a tu Ahorro
+                        </h3>
+                        <p>
+                            Al gastar menos de lo presupuestado en tus compras diarias, este remanente se salva automáticamente e incrementa tu patrimonio mensual.
+                        </p>
+                    </div>
+                    <div id="valor-hucha-ahorro-acumulado" class="valor-hucha-destacado">+0,00 €</div>
+                </div>
+
+                <!-- Formulario Rápido: Anotar Gasto en Lugar/Comercio -->
+                <div class="panel-registro-compra-rapida">
+                    <div class="cabecera-registro-compra">
+                        <div class="titulo-registro-compra">
+                            <i data-lucide="plus-circle" style="color: #06b6d4;"></i>
+                            Anotar Gasto en un Lugar o Comercio
+                        </div>
+                        <span style="font-size: 13px; color: var(--color-texto-secundario);">
+                            Actualiza al instante el dinero que te queda para gastar en cada sobre
+                        </span>
+                    </div>
+
+                    <form id="formulario-compra-lugar" class="formulario-compra-lugar">
+                        <!-- Campo Lugar con sugerencias datalist -->
+                        <div class="campo-formulario">
+                            <label for="input-lugar-compra">Lugar / Establecimiento</label>
+                            <input type="text" id="input-lugar-compra" list="lista-sugerencias-lugares" placeholder="Ej. Mercadona, Bar..." required>
+                            <datalist id="lista-sugerencias-lugares">
+                                <!-- Rellenado dinámicamente con JS -->
+                            </datalist>
+                        </div>
+
+                        <!-- Campo Importe -->
+                        <div class="campo-formulario">
+                            <label for="input-importe-compra">Importe (€)</label>
+                            <input type="number" id="input-importe-compra" step="0.01" min="0.01" placeholder="0.00" required>
+                        </div>
+
+                        <!-- Campo Categoría -->
+                        <div class="campo-formulario">
+                            <label for="selector-categoria-compra">Categoría / Sobre</label>
+                            <select id="selector-categoria-compra">
+                                <option value="VIVIENDA_COMIDA">Comida y Aportación Hogar</option>
+                                <option value="OCIO_ESTILO_VIDA" selected>Ocio y Gastos Personales</option>
+                                <option value="DIGITAL_SUSCRIPCIONES">Suscripciones y Facturas</option>
+                                <option value="DEUDAS_OBLIGACIONES">Deudas y Obligaciones</option>
+                                <option value="PREVISION_RESERVAS">Previsión de Recibos / Fondo</option>
+                            </select>
+                        </div>
+
+                        <!-- Campo Medio de Pago -->
+                        <div class="campo-formulario">
+                            <label for="selector-canal-compra">¿Cómo lo pagaste?</label>
+                            <select id="selector-canal-compra">
+                                <option value="Efectivo Físico" selected>Efectivo Físico (Dinero en Mano / B)</option>
+                                <option value="Cuenta Bancaria">Cuenta Bancaria (Tarjeta / Débito)</option>
+                            </select>
+                        </div>
+
+                        <!-- Botón Enviar -->
+                        <button type="submit" class="boton-anotar-gasto">
+                            <i data-lucide="check" style="width: 16px; height: 16px;"></i>
+                            Anotar Gasto
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Rejilla de Sobres Digitales: Presupuesto Disponible por Categoría -->
+                <div>
+                    <h3 style="font-family: var(--fuente-titulos); font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+                        <i data-lucide="layers" style="color: #6366f1;"></i>
+                        Sobres Digitales: Dinero Disponible para Gastar
+                    </h3>
+                    <div id="cuerpo-sobres-presupuesto" class="rejilla-sobres-presupuesto">
+                        <!-- Inyectado dinámicamente con JS -->
+                    </div>
+                </div>
+
+                <!-- Historial de Gastos y Compras Registradas -->
+                <div class="contenedor-historial-compras">
+                    <div class="cabecera-historial-compras">
+                        <div class="titulo-historial">
+                            <i data-lucide="history" style="color: #38bdf8;"></i>
+                            Historial de Gastos Registrados
+                        </div>
+                        <span id="contador-transacciones-registradas" style="font-size: 12px; color: var(--color-texto-secundario);">
+                            0 gastos registrados
+                        </span>
+                    </div>
+
+                    <table class="tabla-datos">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Lugar / Establecimiento</th>
+                                <th>Categoría</th>
+                                <th>Canal de Pago</th>
+                                <th>Importe (€)</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpo-historial-transacciones">
+                            <!-- Inyectado con JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- PESTAÑA 3: CUENTA BANCARIA VS. EFECTIVO FÍSICO -->
         <div id="panel-canales" class="panel-contenido">
             <div class="seccion-comparador-canales">
                 <!-- Columna Cuenta Bancaria -->
@@ -387,7 +509,7 @@
             </div>
         </div>
 
-        <!-- PESTAÑA 3: PROYECCIÓN A 6 MESES (ESTILO EXCEL) -->
+        <!-- PESTAÑA 4: PROYECCIÓN A 6 MESES (ESTILO EXCEL) -->
         <div id="panel-excel" class="panel-contenido">
             <div class="panel-excel-proyeccion">
                 <div class="cabecera-excel-info">
@@ -423,7 +545,7 @@
             </div>
         </div>
 
-        <!-- PESTAÑA 4: GRÁFICOS Y VISUALIZACIÓN -->
+        <!-- PESTAÑA 5: GRÁFICOS Y VISUALIZACIÓN -->
         <div id="panel-graficos" class="panel-contenido">
             <div class="rejilla-graficos">
                 <!-- Gráfico 1: Categorías -->
@@ -461,7 +583,7 @@
             </div>
         </div>
 
-        <!-- PESTAÑA 5: INVERSIONES Y APIS GRATUITAS -->
+        <!-- PESTAÑA 6: INVERSIONES Y APIS GRATUITAS -->
         <div id="panel-inversiones" class="panel-contenido">
             <div class="panel-inversiones-seccion">
                 <div class="tarjeta-aviso-didactico modo-exito">
