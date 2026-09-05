@@ -27,6 +27,7 @@
     --color-rojo-alerta: #ef4444;
     --color-rojo-brillo: rgba(239, 68, 68, 0.2);
     --color-purpura: #8b5cf6;
+    --color-oro: #eab308;
 
     /* Tipografía */
     --fuente-titulos: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -65,7 +66,6 @@ body {
     overflow-x: hidden;
 }
 
-/* Contenedor Principal */
 .contenedor-aplicacion {
     max-width: 1400px;
     margin: 0 auto;
@@ -210,7 +210,7 @@ body {
 }
 
 /* ==========================================================================
-   ASISTENTE DE PRESUPUESTO INICIAL (HERO CARD EN BLANCO)
+   ASISTENTE DE PRESUPUESTO INICIAL (ENTRADA DUAL: CUENTA VS. FÍSICO / B)
    ========================================================================== */
 
 .tarjeta-asistente-inicial {
@@ -254,26 +254,45 @@ body {
 .descripcion-asistente {
     font-size: 15px;
     color: var(--color-texto-secundario);
-    max-width: 800px;
+    max-width: 850px;
 }
 
-.formulario-asistente {
+/* Rejilla de entradas bicanal (Cuenta vs. Físico / B) */
+.rejilla-entradas-bicanal {
     display: grid;
-    grid-template-columns: 1fr 1.6fr auto;
-    gap: 20px;
-    align-items: flex-end;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-bottom: 18px;
 }
 
-@media (max-width: 1024px) {
-    .formulario-asistente {
+@media (max-width: 768px) {
+    .rejilla-entradas-bicanal {
         grid-template-columns: 1fr;
     }
 }
 
-.grupo-entrada-sueldo {
+.bloque-entrada-canal {
+    background: rgba(10, 14, 23, 0.6);
+    border: 1px solid var(--color-borde-vidrio);
+    border-radius: var(--radio-borde-md);
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    transition: var(--transicion-suave);
+}
+
+.bloque-entrada-canal.foco-cuenta {
+    border-left: 4px solid var(--color-indigo);
+}
+
+.bloque-entrada-canal.foco-fisico {
+    border-left: 4px solid var(--color-esmeralda);
+}
+
+.bloque-entrada-canal:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(10, 14, 23, 0.8);
 }
 
 .etiqueta-asistente {
@@ -284,7 +303,7 @@ body {
     letter-spacing: 0.04em;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
 }
 
 .envoltorio-input-euro {
@@ -298,10 +317,10 @@ body {
     background: #07090e;
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: var(--radio-borde-md);
-    padding: 14px 44px 14px 18px;
+    padding: 12px 44px 12px 16px;
     color: #ffffff;
     font-family: var(--fuente-titulos);
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
     outline: none;
     transition: var(--transicion-suave);
@@ -316,23 +335,30 @@ body {
     position: absolute;
     right: 18px;
     font-family: var(--fuente-titulos);
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--color-esmeralda);
     pointer-events: none;
 }
 
-.grupo-seleccion-perfil {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+.fila-configuracion-perfil {
+    display: grid;
+    grid-template-columns: 1.8fr auto;
+    gap: 18px;
+    align-items: flex-end;
+}
+
+@media (max-width: 900px) {
+    .fila-configuracion-perfil {
+        grid-template-columns: 1fr;
+    }
 }
 
 .selector-perfil-estilo {
     background: #07090e;
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: var(--radio-borde-md);
-    padding: 15px 18px;
+    padding: 14px 18px;
     color: #ffffff;
     font-family: var(--fuente-cuerpo);
     font-size: 14px;
@@ -353,7 +379,7 @@ body {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    padding: 15px 28px;
+    padding: 14px 28px;
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     border: 1px solid rgba(16, 185, 129, 0.4);
     border-radius: var(--radio-borde-md);
@@ -365,13 +391,32 @@ body {
     box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
     transition: var(--transicion-suave);
     white-space: nowrap;
-    height: 56px;
+    height: 52px;
 }
 
 .boton-calcular-automatico:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
     filter: brightness(1.1);
+}
+
+.resumen-ingreso-bicanal {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: var(--radio-borde-md);
+    padding: 12px 18px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.resumen-ingreso-bicanal strong {
+    color: #ffffff;
+    font-family: var(--fuente-titulos);
 }
 
 .pie-asistente-ejemplos {
@@ -405,6 +450,82 @@ body {
 .enlace-ejemplo-rapido:hover {
     background: rgba(56, 189, 248, 0.2);
     color: #ffffff;
+}
+
+/* ==========================================================================
+   TARJETA ESTRATÉGICA: CANALIZACIÓN DE EFECTIVO Y ANTI-INFLACIÓN
+   ========================================================================== */
+
+.tarjeta-estrategia-efectivo {
+    background: linear-gradient(135deg, rgba(23, 29, 48, 0.8) 0%, rgba(15, 20, 34, 0.9) 100%);
+    border: 1px solid rgba(234, 179, 8, 0.3);
+    border-radius: var(--radio-borde-lg);
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    box-shadow: var(--sombra-tarjeta);
+    backdrop-filter: blur(16px);
+}
+
+.cabecera-estrategia {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.titulo-estrategia {
+    font-family: var(--fuente-titulos);
+    font-size: 18px;
+    font-weight: 700;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.insignia-estrategia {
+    background: rgba(234, 179, 8, 0.15);
+    color: #facc15;
+    border: 1px solid rgba(234, 179, 8, 0.3);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.rejilla-claves-estrategia {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.caja-clave-estrategia {
+    background: rgba(10, 14, 23, 0.5);
+    border: 1px solid var(--color-borde-vidrio);
+    border-radius: var(--radio-borde-md);
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.caja-clave-estrategia h4 {
+    font-family: var(--fuente-titulos);
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.caja-clave-estrategia p {
+    color: var(--color-texto-secundario);
 }
 
 /* ==========================================================================
@@ -692,7 +813,6 @@ body {
     border-radius: 4px;
 }
 
-/* Paneles de Contenido */
 .panel-contenido {
     display: none;
     animation: aparecerSuave 0.3s ease forwards;
@@ -809,13 +929,8 @@ body {
     vertical-align: middle;
 }
 
-.tabla-datos tr:last-child td {
-    border-bottom: none;
-}
-
-.tabla-datos tr:hover td {
-    background: rgba(255, 255, 255, 0.02);
-}
+.tabla-datos tr:last-child td { border-bottom: none; }
+.tabla-datos tr:hover td { background: rgba(255, 255, 255, 0.02); }
 
 .celda-concepto {
     display: flex;
@@ -845,7 +960,6 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Badges interactivos para cambiar Canal de Pago (Cuenta vs. Físico) */
 .etiqueta-canal {
     display: inline-flex;
     align-items: center;
@@ -1091,6 +1205,88 @@ body {
 }
 
 /* ==========================================================================
+   SECCIÓN DE INVERSIONES Y APIS GRATUITAS
+   ========================================================================== */
+
+.panel-inversiones-seccion {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.rejilla-apis-inversion {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.tarjeta-api-item {
+    background: var(--color-fondo-tarjeta);
+    border: 1px solid var(--color-borde-vidrio);
+    border-radius: var(--radio-borde-lg);
+    padding: 24px;
+    box-shadow: var(--sombra-tarjeta);
+    backdrop-filter: blur(16px);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: var(--transicion-suave);
+}
+
+.tarjeta-api-item:hover {
+    transform: translateY(-3px);
+    border-color: rgba(99, 102, 241, 0.35);
+    background: var(--color-fondo-tarjeta-hover);
+}
+
+.cabecera-api {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.nombre-api {
+    font-family: var(--fuente-titulos);
+    font-size: 17px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.insignia-gratis {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.descripcion-api {
+    font-size: 13px;
+    color: var(--color-texto-secundario);
+    line-height: 1.55;
+    margin-bottom: 16px;
+}
+
+.enlace-doc-api {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #38bdf8;
+    text-decoration: none;
+    font-weight: 600;
+    transition: var(--transicion-suave);
+}
+
+.enlace-doc-api:hover {
+    color: #7dd3fc;
+    text-decoration: underline;
+}
+
+/* ==========================================================================
    GRÁFICOS
    ========================================================================== */
 
@@ -1178,9 +1374,7 @@ body {
 .titulo-modal { font-family: var(--fuente-titulos); font-size: 20px; font-weight: 700; color: #ffffff; }
 
 .formulario-gasto { display: flex; flex-direction: column; gap: 16px; }
-
 .campo-formulario { display: flex; flex-direction: column; gap: 6px; }
-
 .campo-formulario label { font-size: 13px; font-weight: 600; color: var(--color-texto-secundario); }
 
 .campo-formulario input,

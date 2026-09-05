@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Presupuesto Personal Inteligente | Calculadora Automática de Finanzas</title>
-    <meta name="description" content="Calculadora de presupuesto personal inteligente. Introduce tu dinero neto y calcula automáticamente la distribución de gastos, ahorro, inversión y separación entre Cuenta Bancaria y Efectivo Físico.">
+    <title>Presupuesto Personal Inteligente | Calculadora Automática Bicanal</title>
+    <meta name="description" content="Calculadora de presupuesto personal bicanal (Cuenta Bancaria vs. Efectivo Físico/B), estrategia anti-inflación, APIs de inversión y exportador a Excel (.xlsx).">
     
     <!-- Estilos de Diseño Dark Luxury Glassmorphism -->
     <link rel="stylesheet" href="estilos.css">
@@ -26,7 +26,7 @@
                 <div>
                     <h1 class="titulo-aplicacion">Presupuesto Personal Inteligente</h1>
                     <div class="subtitulo-aplicacion">
-                        <span>Planificador Financiero Automático</span>
+                        <span>Control Bicanal: Cuenta y Efectivo</span>
                         <span>•</span>
                         <span id="insignia-estado-actual" class="insignia-estado insignia-neutra">Sin Configurar</span>
                     </div>
@@ -35,7 +35,7 @@
 
             <div class="acciones-cabecera">
                 <!-- Botón Cargar Caso de Ejemplo -->
-                <button id="boton-cargar-ejemplo" class="boton-texto-accion" title="Cargar caso práctico de 1.400€ - 1.600€ con análisis de comida y deudas">
+                <button id="boton-cargar-ejemplo" class="boton-texto-accion" title="Cargar caso práctico de 1.400€ con análisis de comida y deudas">
                     <i data-lucide="file-text" style="width: 16px; height: 16px; color: #38bdf8;"></i>
                     Caso de Ejemplo (1.400€)
                 </button>
@@ -54,47 +54,72 @@
             </div>
         </header>
 
-        <!-- ASISTENTE DE PRESUPUESTO INICIAL (CALCULADORA DE SUELDO NETO) -->
+        <!-- ASISTENTE DE PRESUPUESTO INICIAL (ENTRADA DUAL: BANCO Y EFECTIVO / B) -->
         <section class="tarjeta-asistente-inicial">
             <div class="cabecera-asistente">
                 <h2 class="titulo-asistente">
                     <i data-lucide="calculator" style="color: #10b981;"></i>
-                    Introduce tu Sueldo Neto Mensual
+                    Configura tus Ingresos Netos (Banco y Efectivo)
                 </h2>
                 <p class="descripcion-asistente">
-                    Ingresa tus ingresos limpios mensuales y elige tu situación actual. El sistema calculará en tiempo real lo que deberías gastar en cada área y cuánto retirar en efectivo del cajero para tener tus finanzas bajo control.
+                    Introduce cuánto dinero limpio percibes en tu cuenta bancaria (nómina formal) y cuánto en efectivo físico en mano (propinas, extras o cobros en mano). El sistema cuadrará tus cuentas y diseñará la estrategia perfecta para gastar el efectivo sin perder valor por inflación.
                 </p>
             </div>
 
-            <form id="formulario-asistente-sueldo" class="formulario-asistente">
-                <div class="grupo-entrada-sueldo">
-                    <label for="input-sueldo-neto" class="etiqueta-asistente">
-                        <i data-lucide="coins" style="width: 15px; height: 15px; color: #10b981;"></i>
-                        Dinero Neto al Mes
-                    </label>
-                    <div class="envoltorio-input-euro">
-                        <input type="number" id="input-sueldo-neto" placeholder="Ej. 1400" min="100" step="10" required>
-                        <span class="simbolo-euro">€</span>
+            <form id="formulario-asistente-sueldo">
+                <div class="rejilla-entradas-bicanal">
+                    <!-- Entrada 1: Dinero en Cuenta Bancaria -->
+                    <div class="bloque-entrada-canal foco-cuenta">
+                        <label for="input-sueldo-cuenta" class="etiqueta-asistente">
+                            <i data-lucide="landmark" style="width: 16px; height: 16px; color: #818cf8;"></i>
+                            Dinero en Cuenta Bancaria (€)
+                        </label>
+                        <div class="envoltorio-input-euro">
+                            <input type="number" id="input-sueldo-cuenta" placeholder="Ej. 1000" min="0" step="10">
+                            <span class="simbolo-euro" style="color: #818cf8;">€</span>
+                        </div>
+                        <span style="font-size: 11px; color: var(--color-texto-apagado);">Nómina formal o transferencias bancarias oficiales</span>
+                    </div>
+
+                    <!-- Entrada 2: Dinero en Efectivo Físico / Mano -->
+                    <div class="bloque-entrada-canal foco-fisico">
+                        <label for="input-sueldo-fisico" class="etiqueta-asistente">
+                            <i data-lucide="banknote" style="width: 16px; height: 16px; color: #34d399;"></i>
+                            Dinero en Efectivo / Mano (€)
+                        </label>
+                        <div class="envoltorio-input-euro">
+                            <input type="number" id="input-sueldo-fisico" placeholder="Ej. 400" min="0" step="10">
+                            <span class="simbolo-euro" style="color: #34d399;">€</span>
+                        </div>
+                        <span style="font-size: 11px; color: var(--color-texto-apagado);">Dinero en mano / B, extras o propinas para consumo</span>
                     </div>
                 </div>
 
-                <div class="grupo-seleccion-perfil">
-                    <label for="selector-perfil-vida" class="etiqueta-asistente">
-                        <i data-lucide="compass" style="width: 15px; height: 15px; color: #6366f1;"></i>
-                        Situación de Vida / Perfil
-                    </label>
-                    <select id="selector-perfil-vida" class="selector-perfil-estilo">
-                        <option value="VIVIENDO_PADRES" selected>🏠 Viviendo con mis padres (Aportación al hogar + Ahorro explosivo)</option>
-                        <option value="INDEPENDIENTE_ALQUILER">🔑 Viviendo independiente / Alquiler (Vivienda, comida y suministros)</option>
-                        <option value="REGLA_50_30_20">⚖️ Regla Clásica 50 / 30 / 20 (50% Básicos, 30% Ocio, 20% Ahorro)</option>
-                        <option value="MAXIMO_AHORRO">🚀 Modo Ahorro Agresivo (Gastos mínimos, 70% Ahorro e Inversión)</option>
-                    </select>
+                <!-- Resumen en vivo de la suma total bicanal -->
+                <div id="resumen-bicanal-vivo" class="resumen-ingreso-bicanal">
+                    <span>Sueldo Neto Total Calculado: <strong id="texto-total-neto-vivo" style="color: #38bdf8; font-size: 16px;">0,00 €</strong></span>
+                    <span id="texto-porcentaje-bicanal" style="color: var(--color-texto-secundario);">0% en Banco • 0% en Efectivo</span>
                 </div>
 
-                <button type="submit" class="boton-calcular-automatico">
-                    <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
-                    Calcular Mi Presupuesto
-                </button>
+                <div class="fila-configuracion-perfil">
+                    <div class="grupo-seleccion-perfil">
+                        <label for="selector-perfil-vida" class="etiqueta-asistente">
+                            <i data-lucide="compass" style="width: 15px; height: 15px; color: #6366f1;"></i>
+                            Situación de Vida / Perfil
+                        </label>
+                        <select id="selector-perfil-vida" class="selector-perfil-estilo">
+                            <option value="VIVIENDO_PADRES" selected>🏠 Viviendo con mis padres (Aportación al hogar + Ahorro explosivo)</option>
+                            <option value="INDEPENDIENTE_ALQUILER">🔑 Viviendo independiente / Alquiler (Vivienda, comida y suministros)</option>
+                            <option value="REGLA_50_30_20">⚖️ Regla Clásica 50 / 30 / 20 (50% Básicos, 30% Ocio, 20% Ahorro)</option>
+                            <option value="MAXIMO_AHORRO">🚀 Modo Ahorro Agresivo (Gastos mínimos, 70% Ahorro e Inversión)</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="boton-calcular-automatico">
+                        <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
+                        Calcular Mi Presupuesto
+                    </button>
+                </div>
             </form>
 
             <div class="pie-asistente-ejemplos">
@@ -102,8 +127,38 @@
                     Perfil seleccionado: Gastos fijos bajos. Ideal para liquidar deudas, acumular colchón y maximizar inversión.
                 </span>
                 <button type="button" id="enlace-rapido-ejemplo" class="enlace-ejemplo-rapido">
-                    💡 Ver caso de estudio (1.400€ - 1.600€)
+                    💡 Ver caso práctico (1.000€ cuenta + 400€ efectivo)
                 </button>
+            </div>
+        </section>
+
+        <!-- TARJETA ESTRATÉGICA: CANALIZACIÓN DE EFECTIVO Y BLINDAJE ANTI-INFLACIÓN -->
+        <section id="tarjeta-estrategia-efectivo-bloque" class="tarjeta-estrategia-efectivo" style="display: none;">
+            <div class="cabecera-estrategia">
+                <div class="titulo-estrategia">
+                    <i data-lucide="shield-check" style="color: #eab308; width: 22px; height: 22px;"></i>
+                    Estrategia Financiera: Cómo Gastar el Efectivo sin Perder Dinero
+                </div>
+                <span class="insignia-estrategia">Optimización Fiscal & Anti-Inflación</span>
+            </div>
+
+            <p id="parrafo-estrategia-personalizada" style="font-size: 14px; color: #e2e8f0; line-height: 1.6; margin-bottom: 14px;">
+                <!-- Rellenado dinámicamente con JS -->
+            </p>
+
+            <div class="rejilla-claves-estrategia">
+                <div class="caja-clave-estrategia">
+                    <h4><i data-lucide="shopping-cart" style="width: 16px; height: 16px; color: #10b981;"></i> Técnica de Sustitución</h4>
+                    <p>Paga el 100% de supermercado, gasolina, salidas y comida en efectivo. Al no usar tarjeta en esas compras, tu nómina bancaria se conserva intacta.</p>
+                </div>
+                <div class="caja-clave-estrategia">
+                    <h4><i data-lucide="trending-up" style="width: 16px; height: 16px; color: #38bdf8;"></i> Blindaje de Inversión</h4>
+                    <p>Como tu dinero bancarizado oficial no se gastó en el súper, puedes transferirlo legalmente a fondos indexados o cuentas remuneradas al 7%-10% anual.</p>
+                </div>
+                <div class="caja-clave-estrategia">
+                    <h4><i data-lucide="alert-octagon" style="width: 16px; height: 16px; color: #f87171;"></i> Seguridad con Hacienda</h4>
+                    <p>Nunca ingreses fajos en cajeros. En España los bancos alertan a Hacienda en ingresos continuos o superiores a 1.000€. Gástalo en consumo corriente.</p>
+                </div>
             </div>
         </section>
 
@@ -138,7 +193,7 @@
             <!-- KPI 1: Ingreso Activo -->
             <div class="tarjeta-metrica metrica-ingreso">
                 <div class="cabecera-metrica">
-                    <span class="etiqueta-metrica">Ingreso Neto</span>
+                    <span class="etiqueta-metrica">Ingreso Neto Total</span>
                     <div class="icono-metrica">
                         <i data-lucide="coins" style="width: 20px; height: 20px;"></i>
                     </div>
@@ -146,14 +201,14 @@
                 <div id="metrica-ingreso-valor" class="valor-metrica">0,00 €</div>
                 <div class="subtitulo-metrica">
                     <i data-lucide="calendar" style="width: 13px; height: 13px;"></i>
-                    <span id="subtitulo-ingreso-texto">Mes 1</span>
+                    <span id="subtitulo-ingreso-texto">Cuenta + Efectivo</span>
                 </div>
             </div>
 
             <!-- KPI 2: Cuenta Bancaria -->
             <div class="tarjeta-metrica metrica-cuenta">
                 <div class="cabecera-metrica">
-                    <span class="etiqueta-metrica">Mantener en Cuenta</span>
+                    <span class="etiqueta-metrica">En Cuenta Bancaria</span>
                     <div class="icono-metrica">
                         <i data-lucide="landmark" style="width: 20px; height: 20px;"></i>
                     </div>
@@ -161,14 +216,14 @@
                 <div id="metrica-cuenta-valor" class="valor-metrica">0,00 €</div>
                 <div class="subtitulo-metrica">
                     <i data-lucide="credit-card" style="width: 13px; height: 13px;"></i>
-                    <span>Suscripciones, domiciliaciones y banco</span>
+                    <span>Cargos, recibos y saldo libre</span>
                 </div>
             </div>
 
             <!-- KPI 3: Efectivo Físico -->
             <div class="tarjeta-metrica metrica-fisico">
                 <div class="cabecera-metrica">
-                    <span class="etiqueta-metrica">Retirar en Cajero</span>
+                    <span class="etiqueta-metrica">Gasto en Efectivo</span>
                     <div class="icono-metrica">
                         <i data-lucide="banknote" style="width: 20px; height: 20px;"></i>
                     </div>
@@ -176,7 +231,7 @@
                 <div id="metrica-fisico-valor" class="valor-metrica">0,00 €</div>
                 <div class="subtitulo-metrica">
                     <i data-lucide="wallet" style="width: 13px; height: 13px;"></i>
-                    <span>Dinero en mano para compras y salidas</span>
+                    <span id="subtitulo-fisico-texto">Consumo en billetes físicos</span>
                 </div>
             </div>
 
@@ -228,6 +283,10 @@
             <button class="boton-pestana" data-pestana="panel-graficos">
                 <i data-lucide="bar-chart-3" style="width: 18px; height: 18px;"></i>
                 Gráficos y Visualización
+            </button>
+            <button class="boton-pestana" data-pestana="panel-inversiones">
+                <i data-lucide="trending-up" style="width: 18px; height: 18px; color: #10b981;"></i>
+                Inversiones y APIs Gratuitas
             </button>
         </nav>
 
@@ -286,9 +345,9 @@
                         <div>
                             <div class="titulo-canal-bloque">
                                 <i data-lucide="landmark" style="color: #818cf8;"></i>
-                                Cuenta Bancaria (No tocar en cajero)
+                                Cuenta Bancaria (Pagos con Tarjeta y Domiciliación)
                             </div>
-                            <p class="instruccion-cajero">Dinero que debe permanecer en el banco para cobros automáticos y ahorro</p>
+                            <p class="instruccion-cajero">Dinero que se liquida directamente desde tu banco</p>
                         </div>
                         <div id="total-destacado-cuenta" class="total-destacado-canal">0,00 €</div>
                     </div>
@@ -299,7 +358,7 @@
 
                     <div class="resumen-operativo-caja">
                         <strong style="color: #a5b4fc;">Estrategia de Banco:</strong>
-                        Mantén esta cantidad en tu cuenta corriente para que nunca se rechacen las domiciliaciones, suscripciones ni transferencias programadas.
+                        Mantén esta cantidad en tu cuenta corriente para que nunca se rechacen las domiciliaciones, recibos ni suscripciones.
                     </div>
                 </div>
 
@@ -309,9 +368,9 @@
                         <div>
                             <div class="titulo-canal-bloque">
                                 <i data-lucide="banknote" style="color: #34d399;"></i>
-                                Efectivo Físico (Retirar en Cajero)
+                                Efectivo Físico (Consumo en Mano / B)
                             </div>
-                            <p class="instruccion-cajero">Retirar del cajero a principio de mes para compras en mano</p>
+                            <p id="instruccion-canal-fisico" class="instruccion-cajero">Gastos pagados en billetes físicos para absorber el dinero en mano</p>
                         </div>
                         <div id="total-destacado-fisico" class="total-destacado-canal">0,00 €</div>
                     </div>
@@ -321,8 +380,8 @@
                     </ul>
 
                     <div class="resumen-operativo-caja">
-                        <strong style="color: #6ee7b7;">Control con Billetes:</strong>
-                        Llevar el ocio y la comida en billetes físicos evita el "efecto invisibilidad" del pago con tarjeta contactless y te ayuda a cumplir tu presupuesto al 100%.
+                        <strong style="color: #6ee7b7;">Absorción Inteligente:</strong>
+                        Al pagar la compra del súper, gasolina y ocio con tu efectivo en mano, proteges tu dinero oficial bancario para invertirlo a largo plazo.
                     </div>
                 </div>
             </div>
@@ -402,6 +461,94 @@
             </div>
         </div>
 
+        <!-- PESTAÑA 5: INVERSIONES Y APIS GRATUITAS -->
+        <div id="panel-inversiones" class="panel-contenido">
+            <div class="panel-inversiones-seccion">
+                <div class="tarjeta-aviso-didactico modo-exito">
+                    <div class="icono-aviso">
+                        <i data-lucide="trending-up"></i>
+                    </div>
+                    <div class="contenido-aviso">
+                        <h3>📈 Cómo Invertir tu Dinero Limpio y APIs Gratuitas para Monitorear Costes</h3>
+                        <p>
+                            Al pagar tu consumo diario en efectivo físico, tu dinero bancario queda <strong>100% legal y disponible</strong> para invertir en fondos indexados globales (tipo <strong>MSCI World</strong> o <strong>S&P 500</strong> a través de brókers como MyInvestor, DeGiro o Trade Republic).
+                            A continuación tienes las <strong>mejores APIs gratuitas</strong> para seguir costes (TER), cotizaciones en tiempo real y rentabilidades sin pagar un solo euro.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="rejilla-apis-inversion">
+                    <!-- API 1: Yahoo Finance -->
+                    <div class="tarjeta-api-item">
+                        <div>
+                            <div class="cabecera-api">
+                                <span class="nombre-api">Yahoo Finance API</span>
+                                <span class="insignia-gratis">100% Gratis</span>
+                            </div>
+                            <p class="descripcion-api">
+                                Permite consultar cotizaciones históricas, precios en tiempo real y el ratio de costes totales (TER) de ETFs como VWCE, Vanguard S&P 500 o iShares MSCI World mediante endpoints JSON públicos directos.
+                            </p>
+                        </div>
+                        <a href="https://query1.finance.yahoo.com/v8/finance/chart/VWCE.DE" target="_blank" rel="noopener noreferrer" class="enlace-doc-api">
+                            <span>Ver Endpoint Ejemplo (VWCE)</span>
+                            <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
+                        </a>
+                    </div>
+
+                    <!-- API 2: Alpha Vantage -->
+                    <div class="tarjeta-api-item">
+                        <div>
+                            <div class="cabecera-api">
+                                <span class="nombre-api">Alpha Vantage</span>
+                                <span class="insignia-gratis">Tier Gratuito (25 req/día)</span>
+                            </div>
+                            <p class="descripcion-api">
+                                Especializada en series temporales ajustadas por dividendos y splits para ETFs y acciones globales. Ideal para calcular el crecimiento compuesto a 5 y 10 años.
+                            </p>
+                        </div>
+                        <a href="https://www.alphavantage.co/documentation/" target="_blank" rel="noopener noreferrer" class="enlace-doc-api">
+                            <span>Documentación Alpha Vantage</span>
+                            <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
+                        </a>
+                    </div>
+
+                    <!-- API 3: CoinGecko -->
+                    <div class="tarjeta-api-item">
+                        <div>
+                            <div class="cabecera-api">
+                                <span class="nombre-api">CoinGecko API</span>
+                                <span class="insignia-gratis">Pública sin API Key</span>
+                            </div>
+                            <p class="descripcion-api">
+                                Datos completos de precios, volumen y capitalización de criptomonedas (Bitcoin, Ethereum, etc.) sin necesidad de registrarte ni aportar tarjeta de crédito.
+                            </p>
+                        </div>
+                        <a href="https://www.coingecko.com/es/api" target="_blank" rel="noopener noreferrer" class="enlace-doc-api">
+                            <span>Documentación CoinGecko</span>
+                            <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
+                        </a>
+                    </div>
+
+                    <!-- API 4: Frankfurter (BCE) -->
+                    <div class="tarjeta-api-item">
+                        <div>
+                            <div class="cabecera-api">
+                                <span class="nombre-api">Frankfurter API (BCE)</span>
+                                <span class="insignia-gratis">Open Source Ilimitada</span>
+                            </div>
+                            <p class="descripcion-api">
+                                Rastrea los tipos de cambio oficiales del Banco Central Europeo. Esencial para calcular el impacto divisa (Euro/Dólar) en fondos indexados globales.
+                            </p>
+                        </div>
+                        <a href="https://www.frankfurter.app/" target="_blank" rel="noopener noreferrer" class="enlace-doc-api">
+                            <span>Documentación Frankfurter</span>
+                            <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- MODAL PARA AÑADIR / EDITAR PARTIDA -->
@@ -441,7 +588,7 @@
                     <label for="campo-gasto-canal">Canal de Pago</label>
                     <select id="campo-gasto-canal" name="canal">
                         <option value="Cuenta Bancaria">Cuenta Bancaria (Tarjeta / Domiciliación)</option>
-                        <option value="Efectivo Físico">Efectivo Físico (Retirar en Cajero)</option>
+                        <option value="Efectivo Físico">Efectivo Físico (Retirar en Cajero / Dinero en Mano)</option>
                     </select>
                 </div>
 

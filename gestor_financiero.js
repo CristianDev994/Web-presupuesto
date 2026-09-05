@@ -1,15 +1,18 @@
-// Motor de cálculo financiero universal, adaptativo y configurable por el usuario
+// Motor de cálculo financiero universal con soporte bicanal (Cuenta vs. Físico / B)
 
 import { 
     CANALES_PAGO, 
     CATEGORIAS_GASTO, 
     PERFILES_PRESUPUESTO, 
-    CASO_EJEMPLO_INICIAL 
+    CASO_EJEMPLO_INICIAL,
+    ESTRATEGIAS_CANALIZACION_EFECTIVO 
 } from './datos_iniciales.js';
 
 export class GestorFinanciero {
     constructor() {
-        this.escenarioActual = 'personalizado'; // 'personalizado' | 'ejemplo_optimizado' | 'ejemplo_original'
+        this.escenarioActual = 'personalizado';
+        this.ingresoCuenta = 0;
+        this.ingresoFisico = 0;
         this.ingresoMes1 = 0;
         this.ingresoMesSiguientes = 0;
         this.horizonteMeses = 6;
@@ -17,7 +20,6 @@ export class GestorFinanciero {
         this.mesVisualizado = 1;
         this.perfilSeleccionado = 'VIVIENDO_PADRES';
 
-        // Intentar recuperar sesión previa del usuario; si no existe, arrancar limpio en blanco
         const tieneDatosPrevios = this.cargarDeAlmacenamientoLocal();
         if (!tieneDatosPrevios) {
             this.reiniciarPresupuestoEnBlanco();
@@ -25,10 +27,12 @@ export class GestorFinanciero {
     }
 
     tieneDatosConfigurados() {
-        return this.ingresoMes1 > 0 && this.gastos.length > 0;
+        return (this.ingresoCuenta > 0 || this.ingresoFisico > 0) && this.gastos.length > 0;
     }
 
     reiniciarPresupuestoEnBlanco() {
+        this.ingresoCuenta = 0;
+        this.ingresoFisico = 0;
         this.ingresoMes1 = 0;
         this.ingresoMesSiguientes = 0;
         this.gastos = [];
@@ -36,12 +40,17 @@ export class GestorFinanciero {
         this.guardarEnAlmacenamientoLocal();
     }
 
-    generarPresupuestoAutomatico(sueldoNeto, idPerfil = 'VIVIENDO_PADRES') {
-        const sueldo = parseFloat(sueldoNeto) || 0;
-        if (sueldo <= 0) return false;
+    generarPresupuestoBicanal(ingresoBanco, ingresoMano, idPerfil = 'VIVIENDO_PADRES') {
+        const cuenta = Math.max(0, parseFloat(ingresoBanco) || 0);
+        const fisico = Math.max(0, parseFloat(ingresoMano) || 0);
+        const sueldoTotal = cuenta + fisico;
 
-        this.ingresoMes1 = sueldo;
-        this.ingresoMesSiguientes = sueldo;
+        if (sueldoTotal <= 0) return false;
+
+        this.ingresoCuenta = cuenta;
+        this.ingresoFisico = fisico;
+        this.ingresoMes1 = sueldoTotal;
+        this.ingresoMesSiguientes = sueldoTotal;
         this.perfilSeleccionado = idPerfil;
         this.escenarioActual = 'personalizado';
         this.gastos = [];
@@ -50,11 +59,10 @@ export class GestorFinanciero {
         let sumaCalculada = 0;
 
         configuracionPerfil.partidas.forEach((partida, indice) => {
-            let importe = Math.round((sueldo * (partida.porcentaje / 100)) * 100) / 100;
-            
-            // Si es la última partida, ajustar céntimos de redondeo para cuadrar al 100% exacto
+            let importe = Math.round((sueldoTotal * (partida.porcentaje / 100)) * 100) / 100;
+
             if (indice === configuracionPerfil.partidas.length - 1) {
-                const resto = Math.round((sueldo - sumaCalculada) * 100) / 100;
+                const resto = Math.round((sueldoTotal - sumaCalculada) * 100) / 100;
                 if (resto > 0) importe = resto;
             } else {
                 sumaCalculada += importe;
@@ -78,15 +86,16 @@ export class GestorFinanciero {
     }
 
     cargarCasoEjemplo(esOriginalConDeficit = false) {
+        this.ingresoCuenta = CASO_EJEMPLO_INICIAL.ingresoCuenta || 1000.00;
+        this.ingresoFisico = CASO_EJEMPLO_INICIAL.ingresoFisico || 400.00;
+        this.ingresoMes1 = CASO_EJEMPLO_INICIAL.ingresoMes1;
+        this.ingresoMesSiguientes = CASO_EJEMPLO_INICIAL.ingresoMesSiguientes;
+
         if (esOriginalConDeficit) {
             this.escenarioActual = 'ejemplo_original';
-            this.ingresoMes1 = CASO_EJEMPLO_INICIAL.ingresoMes1;
-            this.ingresoMesSiguientes = CASO_EJEMPLO_INICIAL.ingresoMesSiguientes;
             this.gastos = JSON.parse(JSON.stringify(CASO_EJEMPLO_INICIAL.gastosOriginalesConDeficit));
         } else {
             this.escenarioActual = 'ejemplo_optimizado';
-            this.ingresoMes1 = CASO_EJEMPLO_INICIAL.ingresoMes1;
-            this.ingresoMesSiguientes = CASO_EJEMPLO_INICIAL.ingresoMesSiguientes;
             this.gastos = JSON.parse(JSON.stringify(CASO_EJEMPLO_INICIAL.gastosOptimizados));
         }
         this.guardarEnAlmacenamientoLocal();
@@ -94,19 +103,6 @@ export class GestorFinanciero {
 
     obtenerIngresoParaMes(numeroMes) {
         return numeroMes === 1 ? this.ingresoMes1 : this.ingresoMesSiguientes;
-    }
-
-    actualizarIngreso(tipo, nuevoValor) {
-        const valorNumerico = parseFloat(nuevoValor) || 0;
-        if (tipo === 'mes1') {
-            this.ingresoMes1 = valorNumerico;
-            if (this.ingresoMesSiguientes === 0) {
-                this.ingresoMesSiguientes = valorNumerico;
-            }
-        } else {
-            this.ingresoMesSiguientes = valorNumerico;
-        }
-        this.guardarEnAlmacenamientoLocal();
     }
 
     agregarGasto(nuevoGasto) {
@@ -222,13 +218,15 @@ export class GestorFinanciero {
         const balanceNeto = ingresoActual - totalPresupuestadoCompleto;
         const sobranteConsumo = ingresoActual - totalGastosConsumo;
 
-        // Diagnóstico y salud financiera
+        // Diagnóstico de Absorción de Efectivo Físico / B
+        const analisisEfectivo = this.analizarFlujoEfectivo(totalFisico);
+
         let estadoSalud = 'optimo';
         let mensajeEstado = 'Finanzas equilibradas con capacidad de ahorro e inversión';
 
         if (ingresoActual === 0) {
             estadoSalud = 'vacio';
-            mensajeEstado = 'Introduce tu dinero neto para comenzar a calcular';
+            mensajeEstado = 'Introduce tu dinero neto (cuenta y efectivo) para comenzar';
         } else if (balanceNeto < -0.05) {
             estadoSalud = 'deficit';
             mensajeEstado = `Déficit de ${Math.abs(balanceNeto).toFixed(2)}€. Gastas más de lo que ingresas.`;
@@ -241,9 +239,16 @@ export class GestorFinanciero {
             ? Math.round((totalPresupuestadoCompleto / ingresoActual) * 100) 
             : 0;
 
+        const porcentajeCuenta = ingresoActual > 0 ? Math.round((this.ingresoCuenta / ingresoActual) * 100) : 0;
+        const porcentajeFisico = ingresoActual > 0 ? Math.round((this.ingresoFisico / ingresoActual) * 100) : 0;
+
         return {
             numeroMes,
             ingresoActual,
+            ingresoCuenta: this.ingresoCuenta,
+            ingresoFisico: this.ingresoFisico,
+            porcentajeCuenta,
+            porcentajeFisico,
             totalGastosConsumo,
             totalCuenta,
             totalFisico,
@@ -259,7 +264,45 @@ export class GestorFinanciero {
             porcentajeAsignado,
             estadoSalud,
             mensajeEstado,
-            desglosePorCategoria
+            desglosePorCategoria,
+            analisisEfectivo
+        };
+    }
+
+    analizarFlujoEfectivo(totalGastosEnFisico) {
+        const dineroManoIngresado = this.ingresoFisico;
+        const gastosConsumoFisico = totalGastosEnFisico;
+
+        let situacion = 'equilibrado';
+        let dineroLiberadoParaInvertir = 0;
+        let dineroSobranteEnMano = 0;
+        let recomendacion = '';
+
+        if (dineroManoIngresado === 0) {
+            // No ingresa dinero en B; todo sale de la cuenta y se retira en cajero si procede
+            situacion = 'retirada_cajero';
+            recomendacion = `Retira ${gastosConsumoFisico.toFixed(2)}€ del cajero al principio de mes para llevar en billetes físicos.`;
+        } else if (dineroManoIngresado <= gastosConsumoFisico) {
+            // Situación ideal: el 100% del efectivo en B se consume en compras normales sin tocar cajeros
+            situacion = 'absorcion_completa';
+            dineroLiberadoParaInvertir = dineroManoIngresado;
+            const diferenciaARetirar = gastosConsumoFisico - dineroManoIngresado;
+            recomendacion = `¡Absorción perfecta! Tus ${dineroManoIngresado.toFixed(2)}€ en mano cubren parte de tu consumo diario (supermercado, ocio, gasolina). Solo necesitas sacar ${diferenciaARetirar.toFixed(2)}€ del cajero. Has liberado ${dineroLiberadoParaInvertir.toFixed(2)}€ limpios en tu cuenta bancaria para inversión o ahorro.`;
+        } else {
+            // El dinero en B supera los gastos físicos habituales
+            situacion = 'excedente_efectivo';
+            dineroLiberadoParaInvertir = gastosConsumoFisico;
+            dineroSobranteEnMano = dineroManoIngresado - gastosConsumoFisico;
+            recomendacion = `Tienes un excedente de ${dineroSobranteEnMano.toFixed(2)}€ en efectivo que supera tus gastos corrientes de este mes. NUNCA lo ingreses de golpe en cajeros automáticos para evitar avisos bancarios. Canalízalo adelantando compras cotidianas, adquiriendo tarjetas regalo en supermercados o usándolo en meses venideros para no perder poder adquisitivo por inflación.`;
+        }
+
+        return {
+            dineroManoIngresado,
+            gastosConsumoFisico,
+            situacion,
+            dineroLiberadoParaInvertir,
+            dineroSobranteEnMano,
+            recomendacion
         };
     }
 
@@ -270,11 +313,10 @@ export class GestorFinanciero {
 
         for (let mes = 1; mes <= this.horizonteMeses; mes++) {
             const resumen = this.calcularResumenMes(mes);
-            
+
             let ahorroMes = resumen.totalAhorroAsignado;
             let inversionMes = resumen.totalInversionAsignada;
 
-            // Si hay sobrante positivo no asignado, repartir 50/50 por defecto
             if (resumen.balanceNeto > 0) {
                 ahorroMes += Math.round((resumen.balanceNeto * 0.5) * 100) / 100;
                 inversionMes += Math.round((resumen.balanceNeto * 0.5) * 100) / 100;
@@ -308,6 +350,8 @@ export class GestorFinanciero {
         try {
             const estadoAGuardar = {
                 escenarioActual: this.escenarioActual,
+                ingresoCuenta: this.ingresoCuenta,
+                ingresoFisico: this.ingresoFisico,
                 ingresoMes1: this.ingresoMes1,
                 ingresoMesSiguientes: this.ingresoMesSiguientes,
                 perfilSeleccionado: this.perfilSeleccionado,
@@ -325,8 +369,10 @@ export class GestorFinanciero {
             if (datosGuardados) {
                 const objeto = JSON.parse(datosGuardados);
                 this.escenarioActual = objeto.escenarioActual || 'personalizado';
-                this.ingresoMes1 = parseFloat(objeto.ingresoMes1) || 0;
-                this.ingresoMesSiguientes = parseFloat(objeto.ingresoMesSiguientes) || 0;
+                this.ingresoCuenta = parseFloat(objeto.ingresoCuenta) || 0;
+                this.ingresoFisico = parseFloat(objeto.ingresoFisico) || 0;
+                this.ingresoMes1 = parseFloat(objeto.ingresoMes1) || (this.ingresoCuenta + this.ingresoFisico);
+                this.ingresoMesSiguientes = parseFloat(objeto.ingresoMesSiguientes) || this.ingresoMes1;
                 this.perfilSeleccionado = objeto.perfilSeleccionado || 'VIVIENDO_PADRES';
                 if (Array.isArray(objeto.gastos) && objeto.gastos.length > 0) {
                     this.gastos = objeto.gastos;

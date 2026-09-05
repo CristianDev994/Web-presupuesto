@@ -1,4 +1,4 @@
-// Controlador principal de la interfaz de usuario, eventos, gráficos y cálculos automáticos
+// Controlador principal de la interfaz de usuario con soporte bicanal y asesor de efectivo
 
 import { CANALES_PAGO, CATEGORIAS_GASTO, PERFILES_PRESUPUESTO } from './datos_iniciales.js';
 import { GestorFinanciero } from './gestor_financiero.js';
@@ -14,26 +14,56 @@ export class ControladorInterfaz {
     }
 
     iniciar() {
-        this.configurarAsistenteSueldo();
+        this.configurarAsistenteSueldoBicanal();
         this.configurarNavegacionPestanas();
         this.configurarModalFormulario();
         this.configurarFiltrosYAcciones();
         this.actualizarVistaCompleta();
     }
 
-    configurarAsistenteSueldo() {
+    configurarAsistenteSueldoBicanal() {
         const formulario = document.getElementById('formulario-asistente-sueldo');
         const selectorPerfil = document.getElementById('selector-perfil-vida');
-        const inputSueldo = document.getElementById('input-sueldo-neto');
+        const inputCuenta = document.getElementById('input-sueldo-cuenta');
+        const inputFisico = document.getElementById('input-sueldo-fisico');
+        const textoTotalNeto = document.getElementById('texto-total-neto-vivo');
+        const textoPorcentaje = document.getElementById('texto-porcentaje-bicanal');
         const textoPerfil = document.getElementById('texto-explicativo-perfil');
         const botonCargarEjemplo = document.getElementById('boton-cargar-ejemplo');
         const enlaceRapidoEjemplo = document.getElementById('enlace-rapido-ejemplo');
         const botonReiniciar = document.getElementById('boton-reiniciar-limpio');
 
-        // Sincronizar campo con el estado actual si existe
-        if (inputSueldo && this.gestor.ingresoMes1 > 0) {
-            inputSueldo.value = this.gestor.ingresoMes1;
+        // Precargar valores guardados si existen
+        if (inputCuenta && this.gestor.ingresoCuenta > 0) {
+            inputCuenta.value = this.gestor.ingresoCuenta;
         }
+        if (inputFisico && this.gestor.ingresoFisico > 0) {
+            inputFisico.value = this.gestor.ingresoFisico;
+        }
+
+        const actualizarResumenEnVivo = () => {
+            const valCuenta = parseFloat(inputCuenta.value) || 0;
+            const valFisico = parseFloat(inputFisico.value) || 0;
+            const suma = valCuenta + valFisico;
+
+            if (textoTotalNeto) {
+                textoTotalNeto.textContent = `${suma.toFixed(2)} €`;
+            }
+
+            if (textoPorcentaje) {
+                if (suma > 0) {
+                    const pctCuenta = Math.round((valCuenta / suma) * 100);
+                    const pctFisico = Math.round((valFisico / suma) * 100);
+                    textoPorcentaje.textContent = `${pctCuenta}% en Banco • ${pctFisico}% en Efectivo`;
+                } else {
+                    textoPorcentaje.textContent = '0% en Banco • 0% en Efectivo';
+                }
+            }
+        };
+
+        if (inputCuenta) inputCuenta.addEventListener('input', actualizarResumenEnVivo);
+        if (inputFisico) inputFisico.addEventListener('input', actualizarResumenEnVivo);
+        actualizarResumenEnVivo();
 
         if (selectorPerfil) {
             selectorPerfil.value = this.gestor.perfilSeleccionado || 'VIVIENDO_PADRES';
@@ -48,18 +78,18 @@ export class ControladorInterfaz {
         if (formulario) {
             formulario.addEventListener('submit', (evento) => {
                 evento.preventDefault();
-                const sueldo = parseFloat(inputSueldo.value) || 0;
+                const sueldoCuenta = parseFloat(inputCuenta.value) || 0;
+                const sueldoFisico = parseFloat(inputFisico.value) || 0;
                 const perfilId = selectorPerfil.value;
 
-                if (sueldo <= 0) {
-                    alert('Por favor, introduce un sueldo neto mensual válido mayor a 0€');
+                if (sueldoCuenta + sueldoFisico <= 0) {
+                    alert('Por favor, introduce un importe válido en cuenta bancaria o en efectivo (mayor a 0€)');
                     return;
                 }
 
-                this.gestor.generarPresupuestoAutomatico(sueldo, perfilId);
+                this.gestor.generarPresupuestoBicanal(sueldoCuenta, sueldoFisico, perfilId);
                 this.actualizarVistaCompleta();
 
-                // Desplazamiento suave hacia las métricas
                 const seccionMetricas = document.querySelector('.rejilla-metricas');
                 if (seccionMetricas) {
                     seccionMetricas.scrollIntoView({ behavior: 'smooth' });
@@ -69,8 +99,10 @@ export class ControladorInterfaz {
 
         const accionCargarEjemplo = () => {
             this.gestor.cargarCasoEjemplo(false);
-            if (inputSueldo) inputSueldo.value = 1400;
+            if (inputCuenta) inputCuenta.value = 1000;
+            if (inputFisico) inputFisico.value = 400;
             if (selectorPerfil) selectorPerfil.value = 'VIVIENDO_PADRES';
+            actualizarResumenEnVivo();
             this.actualizarVistaCompleta();
         };
 
@@ -81,7 +113,9 @@ export class ControladorInterfaz {
             botonReiniciar.addEventListener('click', () => {
                 if (confirm('¿Deseas reiniciar y poner el presupuesto en blanco para introducir nuevos datos?')) {
                     this.gestor.reiniciarPresupuestoEnBlanco();
-                    if (inputSueldo) inputSueldo.value = '';
+                    if (inputCuenta) inputCuenta.value = '';
+                    if (inputFisico) inputFisico.value = '';
+                    actualizarResumenEnVivo();
                     this.actualizarVistaCompleta();
                 }
             });
@@ -239,6 +273,7 @@ export class ControladorInterfaz {
         const resumen = this.gestor.calcularResumenMes(mes);
 
         this.renderizarMetricas(resumen);
+        this.renderizarTarjetaEstrategiaEfectivo(resumen);
         this.renderizarBarraDistribucion(resumen);
         this.renderizarAvisoDidactico(resumen);
         this.renderizarTablaGastos();
@@ -261,11 +296,24 @@ export class ControladorInterfaz {
         const elFisico = document.getElementById('metrica-fisico-valor');
         const elAhorro = document.getElementById('metrica-ahorro-valor');
         const elBalance = document.getElementById('metrica-balance-valor');
+        const subIngreso = document.getElementById('subtitulo-ingreso-texto');
+        const subFisico = document.getElementById('subtitulo-fisico-texto');
         const insignia = document.getElementById('insignia-estado-actual');
 
         if (elIngreso) elIngreso.textContent = `${resumen.ingresoActual.toFixed(2)} €`;
+        if (subIngreso) {
+            subIngreso.textContent = `${resumen.ingresoCuenta.toFixed(2)}€ Banco / ${resumen.ingresoFisico.toFixed(2)}€ Efectivo`;
+        }
+
         if (elCuenta) elCuenta.textContent = `${resumen.totalCuenta.toFixed(2)} €`;
         if (elFisico) elFisico.textContent = `${resumen.totalFisico.toFixed(2)} €`;
+        if (subFisico) {
+            if (resumen.ingresoFisico > 0) {
+                subFisico.textContent = `Absorbe ${Math.min(resumen.ingresoFisico, resumen.totalFisico).toFixed(2)}€ de tu efectivo en mano`;
+            } else {
+                subFisico.textContent = 'Retirada para billetes en cartera';
+            }
+        }
 
         const totalAhorroInversion = resumen.totalAhorroAsignado + resumen.totalInversionAsignada;
         if (elAhorro) elAhorro.textContent = `${totalAhorroInversion.toFixed(2)} €`;
@@ -292,11 +340,27 @@ export class ControladorInterfaz {
                 insignia.textContent = 'Caso Inicial (Déficit)';
             } else if (resumen.ingresoActual > 0) {
                 insignia.className = 'insignia-estado insignia-optimizada';
-                insignia.textContent = 'Presupuesto Activo';
+                insignia.textContent = `Bicanal: ${resumen.porcentajeCuenta}% Banco / ${resumen.porcentajeFisico}% Efectivo`;
             } else {
                 insignia.className = 'insignia-estado insignia-neutra';
                 insignia.textContent = 'Sin Configurar (En Blanco)';
             }
+        }
+    }
+
+    renderizarTarjetaEstrategiaEfectivo(resumen) {
+        const bloqueEstrategia = document.getElementById('tarjeta-estrategia-efectivo-bloque');
+        const parrafoEstrategia = document.getElementById('parrafo-estrategia-personalizada');
+
+        if (!bloqueEstrategia || !parrafoEstrategia) return;
+
+        if (resumen.ingresoFisico > 0) {
+            bloqueEstrategia.style.display = 'block';
+            parrafoEstrategia.innerHTML = `
+                ${resumen.analisisEfectivo.recomendacion}
+            `;
+        } else {
+            bloqueEstrategia.style.display = 'none';
         }
     }
 
@@ -366,8 +430,8 @@ export class ControladorInterfaz {
                 <div class="contenido-aviso">
                     <h3>👋 ¡Bienvenido a tu Gestor Financiero Inteligente!</h3>
                     <p>
-                        La aplicación está lista en blanco para ti. <strong>Introduce arriba tu dinero neto al mes</strong> y selecciona tu situación actual (con padres, alquiler, o regla 50/30/20). 
-                        El sistema calculará automáticamente cuánto destinar a comida, ocio, ahorro e inversión, y cuánto retirar en billetes en el cajero.
+                        Introduce arriba tu dinero en <strong>cuenta bancaria</strong> y tu dinero en <strong>efectivo físico / en mano</strong>. 
+                        El sistema calculará automáticamente la distribución de tus gastos, canalizará tu efectivo para evitar la inflación y maximizará tu inversión bancarizada.
                     </p>
                 </div>
             `;
@@ -381,10 +445,10 @@ export class ControladorInterfaz {
                     <i data-lucide="check-circle-2"></i>
                 </div>
                 <div class="contenido-aviso">
-                    <h3>✨ Caso de Estudio Práctico: Aportación familiar de 250€ y liquidación de deudas</h3>
+                    <h3>✨ Caso de Estudio: 1.000€ en cuenta bancaria y 400€ en efectivo</h3>
                     <p>
-                        En este ejemplo sobre 1.400€, ajustar la comida a <strong>250€</strong> permite pagar de golpe <strong>180€ de deudas</strong> en el Mes 1. 
-                        A partir del Mes 2 (al subir a 1.600€ y no tener deudas), el excedente supera los <strong>1.100€ mensuales</strong> para ahorro e inversión al 50/50.
+                        Los 400€ de efectivo cubren íntegramente la aportación a casa (250€), las tonterías (70€) y el botellón (38,78€). 
+                        De este modo, tu dinero en cuenta bancaria queda 100% libre para liquidar deudas en el Mes 1 y ahorrar/invertir en fondos indexados a partir del Mes 2.
                     </p>
                 </div>
             `;
@@ -398,10 +462,10 @@ export class ControladorInterfaz {
                     <i data-lucide="alert-triangle"></i>
                 </div>
                 <div class="contenido-aviso">
-                    <h3>⚠️ Alerta de Déficit: Tus gastos superan tus ingresos en ${Math.abs(resumen.balanceNeto).toFixed(2)}€</h3>
+                    <h3>⚠️ Alerta de Déficit: Gastos por encima de tus ingresos en ${Math.abs(resumen.balanceNeto).toFixed(2)}€</h3>
                     <p>
-                        Has presupuestado <strong>${resumen.totalPresupuestadoCompleto.toFixed(2)}€</strong> sobre un sueldo neto de <strong>${resumen.ingresoActual.toFixed(2)}€</strong>. 
-                        Reduce alguna partida de ocio o aportaciones no indispensables para cuadrar tus números y no generar deudas.
+                        Has presupuestado <strong>${resumen.totalPresupuestadoCompleto.toFixed(2)}€</strong> sobre un ingreso total de <strong>${resumen.ingresoActual.toFixed(2)}€</strong>. 
+                        Ajusta las partidas para evitar endeudamiento.
                     </p>
                 </div>
             `;
@@ -415,10 +479,10 @@ export class ControladorInterfaz {
                 <i data-lucide="sparkles"></i>
             </div>
             <div class="contenido-aviso">
-                <h3>💡 Diagnóstico Financiero: Plan Cuadrado y Saludable</h3>
+                <h3>💡 Diagnóstico Financiero: Plan Bicanal Saludable</h3>
                 <p>
-                    Retira <strong>${resumen.totalFisico.toFixed(2)}€ en el cajero</strong> a principio de mes para gastos del día a día y mantén <strong>${resumen.totalCuenta.toFixed(2)}€ en tu cuenta bancaria</strong>.
-                    A este ritmo, acumularás <strong>${ahorroAnualProyectado}€ al año</strong> entre ahorro e inversión para tu patrimonio futuro.
+                    Tienes <strong>${resumen.totalCuenta.toFixed(2)}€ comprometidos en banco</strong> y <strong>${resumen.totalFisico.toFixed(2)}€ en gastos en efectivo</strong>. 
+                    A este ritmo acumularás <strong>${ahorroAnualProyectado}€ al año</strong> en tu patrimonio financiero.
                 </p>
             </div>
         `;
@@ -441,7 +505,7 @@ export class ControladorInterfaz {
                 <tr>
                     <td colspan="5" style="text-align: center; padding: 36px 20px; color: var(--color-texto-apagado);">
                         <i data-lucide="inbox" style="width: 32px; height: 32px; margin-bottom: 8px; display: inline-block; opacity: 0.5;"></i>
-                        <p>No hay partidas añadidas aún. Introduce tu sueldo arriba o pulsa <strong>"+ Añadir Nueva Partida"</strong>.</p>
+                        <p>No hay partidas añadidas. Introduce tus ingresos arriba o pulsa <strong>"+ Añadir Nueva Partida"</strong>.</p>
                     </td>
                 </tr>
             `;
@@ -503,9 +567,23 @@ export class ControladorInterfaz {
         const contenedorFisico = document.getElementById('lista-partidas-fisico');
         const totalCuentaDestacado = document.getElementById('total-destacado-cuenta');
         const totalFisicoDestacado = document.getElementById('total-destacado-fisico');
+        const instruccionFisico = document.getElementById('instruccion-canal-fisico');
 
         if (totalCuentaDestacado) totalCuentaDestacado.textContent = `${resumen.totalCuenta.toFixed(2)} €`;
         if (totalFisicoDestacado) totalFisicoDestacado.textContent = `${resumen.totalFisico.toFixed(2)} €`;
+
+        if (instruccionFisico) {
+            if (resumen.ingresoFisico > 0) {
+                if (resumen.ingresoFisico >= resumen.totalFisico) {
+                    instruccionFisico.textContent = `¡Cubierto al 100% con tu dinero en mano! No necesitas ir al cajero.`;
+                } else {
+                    const restante = resumen.totalFisico - resumen.ingresoFisico;
+                    instruccionFisico.textContent = `Tu efectivo en mano cubre ${resumen.ingresoFisico.toFixed(2)}€. Solo necesitas sacar ${restante.toFixed(2)}€ del cajero.`;
+                }
+            } else {
+                instruccionFisico.textContent = `Retirar del cajero a principio de mes para gastos en mano`;
+            }
+        }
 
         if (contenedorCuenta) {
             if (gastosCuenta.length === 0) {
@@ -653,7 +731,7 @@ export class ControladorInterfaz {
             this.instanciasGraficos.canales = new Chart(lienzoCanales, {
                 type: 'bar',
                 data: {
-                    labels: ['Cuenta Bancaria (Banco/Cargos)', 'Efectivo Físico (Cajero)'],
+                    labels: ['Cuenta Bancaria (Banco/Cargos)', 'Efectivo Físico (Consumo en Mano)'],
                     datasets: [{
                         label: 'Importe (€)',
                         data: [resumen.totalCuenta, resumen.totalFisico],
