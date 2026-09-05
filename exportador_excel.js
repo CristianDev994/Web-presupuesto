@@ -1,4 +1,14 @@
-// Exportador profesional a Excel (.xlsx) con 5 hojas incluyendo registro de compras por lugares
+// Exportador profesional a Excel (.xlsx) con 5 hojas de cálculo.
+// Los importes se escriben como NÚMEROS reales en euros (no como texto) para que
+// Excel pueda sumarlos, y con formato de moneda española aplicado a cada celda.
+
+import { CATEGORIAS_GASTO, CANALES_PAGO, SUBTIPOS_PATRIMONIO } from './datos_iniciales.js';
+import { aEuros, formatearEuros, formatearPorcentaje } from './utilidades_dinero.js';
+
+/** Marca un importe en centimos como celda monetaria de la hoja. */
+const moneda = (centimos) => ({ esMoneda: true, valor: aEuros(centimos) });
+
+const FORMATO_MONEDA = '#,##0.00\\ "€"';
 
 export class ExportadorExcel {
     constructor(gestorFinanciero) {
@@ -7,261 +17,321 @@ export class ExportadorExcel {
 
     generarYDescargarExcel() {
         if (typeof XLSX === 'undefined') {
-            alert('La librería SheetJS (XLSX) se está cargando. Por favor, inténtalo de nuevo en unos instantes.');
-            return;
+            return {
+                exito: false,
+                mensaje: 'La librería de Excel aún se está cargando. Inténtalo de nuevo en unos segundos.'
+            };
         }
 
-        const libroTrabajo = XLSX.utils.book_new();
+        try {
+            const libro = XLSX.utils.book_new();
 
-        // 1. Hoja: Presupuesto y Proyección a 6 Meses
-        const hojaProyeccion = this.construirHojaProyeccion();
-        XLSX.utils.book_append_sheet(libroTrabajo, hojaProyeccion, 'Presupuesto_6_Meses');
+            XLSX.utils.book_append_sheet(libro, this.construirHojaProyeccion(), 'Presupuesto_6_Meses');
+            XLSX.utils.book_append_sheet(libro, this.construirHojaComprasLugares(), 'Gastos_Por_Lugares');
+            XLSX.utils.book_append_sheet(libro, this.construirHojaCanalesPago(), 'Cuenta_vs_Fisico');
+            XLSX.utils.book_append_sheet(libro, this.construirHojaDesglosePartidas(), 'Desglose_Partidas');
+            XLSX.utils.book_append_sheet(libro, this.construirHojaDiagnostico(), 'Salud_Financiera');
 
-        // 2. Hoja: Control Diario por Lugares y Sobres Digitales
-        const hojaLugares = this.construirHojaComprasLugares();
-        XLSX.utils.book_append_sheet(libroTrabajo, hojaLugares, 'Gastos_Por_Lugares');
-
-        // 3. Hoja: Cuenta Bancaria vs. Efectivo Físico
-        const hojaCanales = this.construirHojaCanalesPago();
-        XLSX.utils.book_append_sheet(libroTrabajo, hojaCanales, 'Cuenta_vs_Fisico');
-
-        // 4. Hoja: Catálogo Completo de Partidas
-        const hojaDesglose = this.construirHojaDesgloseGastos();
-        XLSX.utils.book_append_sheet(libroTrabajo, hojaDesglose, 'Desglose_Partidas');
-
-        // 5. Hoja: Diagnóstico y Salud Financiera
-        const hojaDiagnostico = this.construirHojaDiagnostico();
-        XLSX.utils.book_append_sheet(libroTrabajo, hojaDiagnostico, 'Salud_Financiera');
-
-        const nombreArchivo = 'Mi_Presupuesto_Personal.xlsx';
-        XLSX.writeFile(libroTrabajo, nombreArchivo);
+            XLSX.writeFile(libro, `Mi_Presupuesto_${this.gestor.obtenerFechaHoy()}.xlsx`);
+            return { exito: true, mensaje: 'Excel generado correctamente.' };
+        } catch (error) {
+            return { exito: false, mensaje: `No se pudo generar el Excel: ${error.message}` };
+        }
     }
 
-    construirHojaComprasLugares() {
-        const transacciones = this.gestor.transacciones;
-        const seguimiento = this.gestor.obtenerSeguimientoSobres();
-        const dineroSalvadoTotal = this.gestor.calcularTotalSalvadoParaAhorro();
+    /**
+     * Convierte la matriz de filas en una hoja aplicando el formato de moneda
+     * SOLO a las celdas marcadas con moneda(), nunca a contadores o posiciones.
+     */
+    prepararHoja(filas, anchosColumnas) {
+        const celdasMoneda = [];
 
-        const filasDatos = [
-            ['CONTROL DIARIO DE GASTOS POR LUGAR Y SOBRES DIGITALES'],
-            [`Dinero Total No Gastado (Transferido a tu Ahorro): +${dineroSalvadoTotal.toFixed(2)} €`],
+        const datos = filas.map((fila, indiceFila) => (fila || []).map((celda, indiceColumna) => {
+            if (celda && typeof celda === 'object' && celda.esMoneda) {
+                celdasMoneda.push({ r: indiceFila, c: indiceColumna });
+                return celda.valor;
+            }
+            return celda;
+        }));
+
+        const hoja = XLSX.utils.aoa_to_sheet(datos);
+
+        celdasMoneda.forEach(({ r, c }) => {
+            const referencia = XLSX.utils.encode_cell({ r, c });
+            if (hoja[referencia] && hoja[referencia].t === 'n') {
+                hoja[referencia].z = FORMATO_MONEDA;
+            }
+        });
+
+        hoja['!cols'] = anchosColumnas;
+        return hoja;
+    }
+
+    nombreCategoria(clave) {
+        return CATEGORIAS_GASTO[clave] ? CATEGORIAS_GASTO[clave].nombre : clave;
+    }
+
+    // ----------------------------------------------------------------------
+    // HOJA 1: PROYECCIÓN
+    // ----------------------------------------------------------------------
+    construirHojaProyeccion() {
+        const proyeccion = this.gestor.calcularProyeccion();
+        const totales = this.gestor.calcularTotalesProyeccion(proyeccion);
+        const resumen = this.gestor.calcularResumenMes(1);
+
+        const filas = [
+            ['PLANIFICACIÓN FINANCIERA Y PROYECCIÓN A 6 MESES'],
+            [`Ingreso neto mensual: ${formatearEuros(resumen.ingresoCent)} (${formatearEuros(resumen.ingresoCuentaCent)} en banco + ${formatearEuros(resumen.ingresoFisicoCent)} en efectivo)`],
+            ['Generado con el Gestor de Presupuesto Personal Universal. Importes exactos al céntimo.'],
             [],
-            ['1. ESTADO DE SOBRES DIGITALES (PRESUPUESTO DISPONIBLE POR CATEGORÍA)'],
-            ['Categoría', 'Presupuesto Límite (€)', 'Gastado Real (€)', 'Dinero Disponible (€)', 'Consumo %', 'Dinero Salvado para Ahorro (€)']
+            [
+                'Mes', 'Ingreso neto', 'Gastos fijos', 'Deudas liquidadas', 'Consumo total',
+                'Sobrante libre', 'Ahorro del mes', 'Inversión del mes',
+                'Ahorro acumulado', 'Inversión acumulada', 'Patrimonio total'
+            ]
         ];
 
-        Object.values(seguimiento).forEach(sobre => {
-            filasDatos.push([
-                sobre.configuracion.nombre,
-                sobre.limitePresupuestado,
-                sobre.dineroGastado,
-                sobre.dineroDisponible,
-                `${sobre.porcentajeConsumido}%`,
-                sobre.dineroSalvadoParaAhorro
+        proyeccion.forEach(fila => {
+            filas.push([
+                `Mes ${fila.mes}`,
+                moneda(fila.ingresoCent),
+                moneda(fila.gastosFijosCent),
+                moneda(fila.deudasCent),
+                moneda(fila.consumoCent),
+                moneda(fila.sobranteCent),
+                moneda(fila.ahorroMesCent),
+                moneda(fila.inversionMesCent),
+                moneda(fila.ahorroAcumuladoCent),
+                moneda(fila.inversionAcumuladaCent),
+                moneda(fila.patrimonioTotalCent)
             ]);
         });
 
-        filasDatos.push([]);
-        filasDatos.push(['2. HISTORIAL DE GASTOS REGISTRADOS EN COMERCIOS Y LUGARES']);
-        filasDatos.push(['ID', 'Fecha', 'Lugar / Establecimiento', 'Categoría', 'Canal de Pago', 'Importe (€)', 'Notas']);
+        filas.push([]);
+        filas.push([
+            `TOTAL ${totales.meses} MESES`,
+            moneda(totales.ingresosCent),
+            '',
+            moneda(totales.deudasCent),
+            moneda(totales.consumoCent),
+            moneda(totales.sobranteCent),
+            '',
+            '',
+            moneda(totales.ahorroCent),
+            moneda(totales.inversionCent),
+            moneda(totales.patrimonioCent)
+        ]);
+
+        const hoja = this.prepararHoja(filas, [
+            { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 16 },
+            { wch: 16 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 18 }
+        ]);
+        hoja['!freeze'] = { xSplit: 1, ySplit: 5 };
+        return hoja;
+    }
+
+    // ----------------------------------------------------------------------
+    // HOJA 2: GASTOS POR LUGAR Y SOBRES
+    // ----------------------------------------------------------------------
+    construirHojaComprasLugares() {
+        const mes = this.gestor.mesVisualizado;
+        const seguimiento = this.gestor.obtenerSeguimientoSobres(mes);
+        const salvadoCent = this.gestor.calcularTotalSalvadoParaAhorroCent(mes);
+        const transacciones = this.gestor.obtenerTransaccionesDelMes(mes);
+
+        const filas = [
+            [`CONTROL DIARIO DE GASTOS POR LUGAR — MES ${mes}`],
+            [`Dinero aún no gastado que engorda tu ahorro: ${formatearEuros(salvadoCent)}`],
+            [],
+            ['1. ESTADO DE LOS SOBRES DIGITALES'],
+            ['Categoría', 'Presupuestado', 'Gastado real', 'Disponible', 'Consumo', 'Movimientos', 'Estado']
+        ];
+
+        const textosEstado = { saludable: 'Dentro del límite', alerta: 'Atención', sobregasto: 'Excedido' };
+
+        Object.values(seguimiento).forEach(sobre => {
+            filas.push([
+                sobre.configuracion.nombre,
+                moneda(sobre.limitePresupuestadoCent),
+                moneda(sobre.gastadoCent),
+                moneda(sobre.disponibleCent),
+                formatearPorcentaje(sobre.porcentajeConsumido),
+                sobre.numeroMovimientos,
+                textosEstado[sobre.estadoSobre]
+            ]);
+        });
+
+        filas.push([]);
+        filas.push(['2. RANKING DE LUGARES CON MÁS GASTO']);
+        filas.push(['Posición', 'Lugar', 'Total gastado', 'Visitas']);
+
+        const ranking = this.gestor.obtenerRankingLugares(mes, 10);
+        if (ranking.length === 0) {
+            filas.push(['-', 'Sin gastos registrados', 0, 0]);
+        } else {
+            ranking.forEach((item, indice) => {
+                filas.push([indice + 1, item.lugar, moneda(item.totalCent), item.visitas]);
+            });
+        }
+
+        filas.push([]);
+        filas.push(['3. HISTORIAL COMPLETO DE GASTOS REGISTRADOS']);
+        filas.push(['Fecha', 'Lugar / Establecimiento', 'Categoría', 'Canal de pago', 'Importe', 'Notas']);
 
         if (transacciones.length === 0) {
-            filasDatos.push(['-', '-', 'Sin compras registradas aún', '-', '-', 0, '-']);
+            filas.push(['-', 'Sin gastos registrados en este mes', '-', '-', 0, '']);
         } else {
-            transacciones.forEach(t => {
-                filasDatos.push([
-                    t.id,
-                    t.fecha,
-                    t.lugar,
-                    t.categoria,
-                    t.canal,
-                    t.importe,
-                    t.notas || ''
+            transacciones.forEach(transaccion => {
+                filas.push([
+                    transaccion.fecha,
+                    transaccion.lugar,
+                    this.nombreCategoria(transaccion.categoria),
+                    transaccion.canal,
+                    moneda(transaccion.importeCent),
+                    transaccion.notas || ''
                 ]);
             });
         }
 
-        const hoja = XLSX.utils.aoa_to_sheet(filasDatos);
-        hoja['!cols'] = [
-            { wch: 18 }, { wch: 14 }, { wch: 32 }, { wch: 28 }, { wch: 22 }, { wch: 16 }, { wch: 35 }
-        ];
-        return hoja;
-    }
-
-    construirHojaProyeccion() {
-        const proyeccion = this.gestor.calcularProyeccion6Meses();
-        const ingresoM1 = this.gestor.obtenerIngresoParaMes(1);
-        const ingresoM2 = this.gestor.obtenerIngresoParaMes(2);
-
-        const filasDatos = [
-            ['PLANIFICACIÓN FINANCIERA Y PROYECCIÓN A 6 MESES'],
-            [`Ingreso Mes 1: ${ingresoM1.toFixed(2)} € | Ingreso Meses Siguientes: ${ingresoM2.toFixed(2)} €`],
-            ['Generado automáticamente con el Gestor de Presupuesto Personal Universal'],
-            [],
-            [
-                'Mes',
-                'Ingreso Neto (€)',
-                'Gastos Fijos/Consumo (€)',
-                'Deudas Liquidadas (€)',
-                'Gasto Total Consumo (€)',
-                'Sobrante Libre (€)',
-                'Ahorro Mensual (€)',
-                'Inversión Mensual (€)',
-                'Ahorro Acumulado (€)',
-                'Inversión Acumulada (€)',
-                'Patrimonio Total (€)'
-            ]
-        ];
-
-        proyeccion.forEach(item => {
-            filasDatos.push([
-                `Mes ${item.mes}`,
-                item.ingreso,
-                item.gastosFijos,
-                item.deudas,
-                item.gastosTotales,
-                item.sobrante,
-                item.ahorroMensual,
-                item.inversionMensual,
-                item.ahorroAcumulado,
-                item.inversionAcumulada,
-                item.patrimonioTotal
-            ]);
-        });
-
-        const ultimoMes = proyeccion[proyeccion.length - 1];
-        const sumaIngresos = proyeccion.reduce((acc, fila) => acc + fila.ingreso, 0);
-        const sumaGastos = proyeccion.reduce((acc, fila) => acc + fila.gastosTotales, 0);
-        const sumaSobrantes = proyeccion.reduce((acc, fila) => acc + fila.sobrante, 0);
-
-        filasDatos.push([]);
-        filasDatos.push([
-            'TOTAL ACUMULADO 6 MESES',
-            sumaIngresos,
-            '-',
-            '-',
-            sumaGastos,
-            sumaSobrantes,
-            ultimoMes.ahorroAcumulado,
-            ultimoMes.inversionAcumulada,
-            ultimoMes.ahorroAcumulado,
-            ultimoMes.inversionAcumulada,
-            ultimoMes.patrimonioTotal
+        return this.prepararHoja(filas, [
+            { wch: 30 }, { wch: 32 }, { wch: 26 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 20 }
         ]);
-
-        const hoja = XLSX.utils.aoa_to_sheet(filasDatos);
-        hoja['!cols'] = [
-            { wch: 12 }, { wch: 18 }, { wch: 24 }, { wch: 22 }, 
-            { wch: 22 }, { wch: 18 }, { wch: 20 }, { wch: 20 }, 
-            { wch: 22 }, { wch: 24 }, { wch: 22 }
-        ];
-
-        return hoja;
     }
 
+    // ----------------------------------------------------------------------
+    // HOJA 3: CUENTA BANCARIA VS EFECTIVO
+    // ----------------------------------------------------------------------
     construirHojaCanalesPago() {
-        const resumenMes1 = this.gestor.calcularResumenMes(1);
-        const gastosMes1 = this.gestor.obtenerGastosActivosMes(1);
+        const resumen = this.gestor.calcularResumenMes(1);
+        const partidas = this.gestor.obtenerGastosActivosMes(1);
+        const partidasCuenta = partidas.filter(gasto => gasto.canal === CANALES_PAGO.CUENTA);
+        const partidasFisico = partidas.filter(gasto => gasto.canal === CANALES_PAGO.FISICO);
 
-        const gastosCuenta = gastosMes1.filter(item => item.canal === 'Cuenta Bancaria');
-        const gastosFisico = gastosMes1.filter(item => item.canal === 'Efectivo Físico');
-
-        const filasDatos = [
+        const filas = [
             ['PLAN OPERATIVO: CUENTA BANCARIA VS. EFECTIVO FÍSICO'],
-            [`Ingreso mensual neto considerado: ${resumenMes1.ingresoActual.toFixed(2)} €`],
+            [`Ingreso neto mensual: ${formatearEuros(resumen.ingresoCent)}`],
+            [resumen.analisisEfectivo.recomendacion],
             [],
-            ['1. DINERO EN EFECTIVO FÍSICO (EN MANO / B / CAJERO)'],
-            ['Concepto', 'Categoría', 'Importe (€)', 'Finalidad y Recomendación']
+            ['1. GASTOS A PAGAR EN EFECTIVO FÍSICO'],
+            ['Concepto', 'Categoría', 'Importe', 'Finalidad']
         ];
 
-        let subtotalFisico = 0;
-        gastosFisico.forEach(gasto => {
-            subtotalFisico += gasto.importe;
-            filasDatos.push([
+        partidasFisico.forEach(gasto => {
+            filas.push([
                 gasto.concepto,
-                gasto.categoria,
-                gasto.importe,
+                this.nombreCategoria(gasto.categoria),
+                moneda(gasto.importeCent),
                 gasto.descripcion || 'Gasto en billetes para control cotidiano'
             ]);
         });
+        filas.push(['TOTAL EN EFECTIVO', '', moneda(resumen.fisicoCent), 'Consumo en billetes físicos']);
 
-        filasDatos.push(['TOTAL GASTOS EN EFECTIVO', '', subtotalFisico, 'Consumo en billetes físicos']);
-        filasDatos.push([]);
-        filasDatos.push(['2. DINERO A MANTENER INTACTO EN LA CUENTA BANCARIA']);
-        filasDatos.push(['Concepto', 'Categoría', 'Importe (€)', 'Finalidad y Cobro']);
+        filas.push([]);
+        filas.push(['2. GASTOS DOMICILIADOS EN LA CUENTA BANCARIA']);
+        filas.push(['Concepto', 'Categoría', 'Importe', 'Finalidad']);
 
-        let subtotalCuenta = 0;
-        gastosCuenta.forEach(gasto => {
-            subtotalCuenta += gasto.importe;
-            filasDatos.push([
+        partidasCuenta.forEach(gasto => {
+            filas.push([
                 gasto.concepto,
-                gasto.categoria,
-                gasto.importe,
+                this.nombreCategoria(gasto.categoria),
+                moneda(gasto.importeCent),
                 gasto.descripcion || 'Cobro por recibo domiciliado o tarjeta'
             ]);
         });
+        filas.push(['TOTAL EN CUENTA', '', moneda(resumen.cuentaCent), 'Mantener disponible en cuenta corriente']);
 
-        filasDatos.push(['TOTAL CARGOS EN CUENTA', '', subtotalCuenta, 'Mantener en cuenta corriente']);
-        filasDatos.push([]);
-        filasDatos.push(['3. RESUMEN GLOBAL DE DISTRIBUCIÓN']);
-        filasDatos.push(['Destino Financiero', 'Medio', 'Importe (€)', 'Instrucción Operativa']);
-        filasDatos.push(['Gastos en Efectivo Físico', 'Mano / Cajero', subtotalFisico, 'Llevar en cartera / sobres']);
-        filasDatos.push(['Gastos en Cuenta Bancaria', 'Banco', subtotalCuenta, 'Dejar para recibos automáticos']);
-        filasDatos.push(['Ahorro Líquido Asignado', 'Cuenta Remunerada', resumenMes1.totalAhorroAsignado, 'Fondo de seguridad / emergencia']);
-        filasDatos.push(['Inversión a Largo Plazo', 'Bróker / Fondos', resumenMes1.totalInversionAsignada, 'Construcción de patrimonio compuesto']);
-        filasDatos.push(['TOTAL ASIGNADO', '', resumenMes1.totalPresupuestadoCompleto, 'Cuadre presupuestario total']);
+        filas.push([]);
+        filas.push(['3. CUADRE OPERATIVO POR CANAL']);
+        filas.push(['Concepto', 'Canal', 'Importe', 'Instrucción']);
+        filas.push(['Ingreso en cuenta bancaria', 'Banco', moneda(resumen.ingresoCuentaCent), 'Dinero oficial recibido']);
+        filas.push(['Gasto comprometido en banco', 'Banco', moneda(resumen.cuentaCent), 'Recibos, tarjeta y aportaciones']);
+        filas.push(['Saldo libre en banco', 'Banco', moneda(resumen.saldoLibreCuentaCent), 'Disponible para invertir o transferir']);
+        filas.push(['Ingreso en efectivo', 'Mano', moneda(resumen.ingresoFisicoCent), 'Billetes recibidos']);
+        filas.push(['Gasto comprometido en efectivo', 'Mano', moneda(resumen.fisicoCent), 'Compra, ocio y consumo diario']);
+        filas.push(['A retirar del cajero', 'Cajero', moneda(resumen.retiradaCajeroCent), 'Sacar a principio de mes si es mayor que cero']);
+        filas.push(['Ahorro líquido asignado', 'Cuenta remunerada', moneda(resumen.ahorroCent), 'Fondo de seguridad']);
+        filas.push(['Inversión asignada', 'Bróker / fondos', moneda(resumen.inversionCent), 'Patrimonio a largo plazo']);
+        filas.push(['TOTAL ASIGNADO', '', moneda(resumen.totalPresupuestadoCent), 'Suma de todas las partidas']);
+        filas.push(['BALANCE (ingreso - asignado)', '', moneda(resumen.balanceNetoCent), resumen.balanceNetoCent === 0 ? 'Cuadre perfecto al céntimo' : resumen.mensajeEstado]);
 
-        const hoja = XLSX.utils.aoa_to_sheet(filasDatos);
-        hoja['!cols'] = [{ wch: 38 }, { wch: 25 }, { wch: 16 }, { wch: 48 }];
-        return hoja;
+        return this.prepararHoja(filas, [{ wch: 38 }, { wch: 26 }, { wch: 16 }, { wch: 50 }]);
     }
 
-    construirHojaDesgloseGastos() {
-        const filasDatos = [
+    // ----------------------------------------------------------------------
+    // HOJA 4: CATÁLOGO DE PARTIDAS
+    // ----------------------------------------------------------------------
+    construirHojaDesglosePartidas() {
+        const filas = [
             ['CATÁLOGO DETALLADO DE PARTIDAS PRESUPUESTARIAS'],
             [],
-            ['ID', 'Concepto', 'Importe (€)', 'Categoría', 'Canal de Pago', 'Recurrente', 'Notas / Descripción']
+            ['Concepto', 'Importe', 'Categoría', 'Tipo de patrimonio', 'Canal de pago', 'Esencial', 'Duración', 'Notas']
         ];
 
         this.gestor.gastos.forEach(gasto => {
-            filasDatos.push([
-                gasto.id,
+            let duracion = 'Todos los meses';
+            if (!gasto.recurrente) {
+                duracion = gasto.mesFiniquito ? `Hasta el mes ${gasto.mesFiniquito}` : 'Solo el mes 1';
+            } else if (gasto.mesFiniquito) {
+                duracion = `Hasta el mes ${gasto.mesFiniquito}`;
+            }
+
+            let tipoPatrimonio = '-';
+            if (gasto.categoria === 'AHORRO_INVERSION') {
+                tipoPatrimonio = gasto.subtipo === SUBTIPOS_PATRIMONIO.INVERSION ? 'Inversión' : 'Ahorro líquido';
+            }
+
+            filas.push([
                 gasto.concepto,
-                gasto.importe,
-                gasto.categoria,
+                moneda(gasto.importeCent),
+                this.nombreCategoria(gasto.categoria),
+                tipoPatrimonio,
                 gasto.canal,
-                gasto.recurrente ? 'Sí' : 'No (Puntual)',
+                gasto.esencial ? 'Sí' : 'No',
+                duracion,
                 gasto.descripcion || ''
             ]);
         });
 
-        const hoja = XLSX.utils.aoa_to_sheet(filasDatos);
-        hoja['!cols'] = [
-            { wch: 18 }, { wch: 38 }, { wch: 15 }, { wch: 26 }, { wch: 18 }, { wch: 14 }, { wch: 55 }
-        ];
-        return hoja;
+        return this.prepararHoja(filas, [
+            { wch: 38 }, { wch: 15 }, { wch: 28 }, { wch: 18 },
+            { wch: 18 }, { wch: 10 }, { wch: 18 }, { wch: 50 }
+        ]);
     }
 
+    // ----------------------------------------------------------------------
+    // HOJA 5: DIAGNÓSTICO
+    // ----------------------------------------------------------------------
     construirHojaDiagnostico() {
         const resumen = this.gestor.calcularResumenMes(1);
+        const totales = this.gestor.calcularTotalesProyeccion();
 
-        const filasDatos = [
-            ['DIAGNÓSTICO Y SALUD FINANCIERA DEL PRESUPUESTO'],
+        const filas = [
+            ['DIAGNÓSTICO Y SALUD FINANCIERA'],
             [],
-            ['Métrica Financiera', 'Valor Calculado', 'Evaluación / Recomendación'],
-            ['Ingreso Neto Mensual', `${resumen.ingresoActual.toFixed(2)} €`, 'Base de cálculo disponible'],
-            ['Gastos de Consumo Totales', `${resumen.totalGastosConsumo.toFixed(2)} €`, 'Total destinado a gastos corrientes'],
-            ['Total en Efectivo (Cajero/Mano)', `${resumen.totalFisico.toFixed(2)} €`, 'Consumo en billetes físicos'],
-            ['Total en Cuenta (Banco)', `${resumen.totalCuenta.toFixed(2)} €`, 'Reservado para domiciliaciones y suscripciones'],
-            ['Ahorro Líquido Mensual', `${resumen.totalAhorroAsignado.toFixed(2)} €`, 'Fondo de emergencia intocable'],
-            ['Inversión a Largo Plazo', `${resumen.totalInversionAsignada.toFixed(2)} €`, 'Aportación a fondos indexados'],
-            ['Balance Neto (Excedente/Déficit)', `${resumen.balanceNeto.toFixed(2)} €`, resumen.balanceNeto >= 0 ? 'Finanzas cuadradas con éxito' : 'ALERTA: Reducir partidas para eliminar déficit'],
-            ['Porcentaje Asignado del Sueldo', `${resumen.porcentajeAsignado} %`, resumen.porcentajeAsignado === 100 ? '100% de los ingresos asignados con propósito' : 'Presupuesto no ajustado al 100%'],
-            ['Diagnóstico Global', resumen.mensajeEstado, 'Evaluación automatizada']
+            ['Métrica', 'Valor', 'Lectura'],
+            ['Ingreso neto mensual', moneda(resumen.ingresoCent), 'Base de cálculo disponible'],
+            ['Gastos de consumo', moneda(resumen.consumoCent), 'Todo lo que no es ahorro ni inversión'],
+            ['Gasto en efectivo', moneda(resumen.fisicoCent), 'Consumo pagado en billetes'],
+            ['Gasto en cuenta bancaria', moneda(resumen.cuentaCent), 'Recibos, tarjeta y domiciliaciones'],
+            ['A retirar del cajero', moneda(resumen.retiradaCajeroCent), resumen.retiradaCajeroCent > 0 ? 'Saca este importe a principio de mes' : 'Tu efectivo en mano cubre el consumo'],
+            ['Ahorro líquido mensual', moneda(resumen.ahorroCent), 'Fondo de emergencia'],
+            ['Inversión mensual', moneda(resumen.inversionCent), 'Aportación a fondos o bróker'],
+            ['Balance del mes', moneda(resumen.balanceNetoCent), resumen.balanceNetoCent === 0 ? 'Cuentas cuadradas al céntimo' : resumen.mensajeEstado],
+            ['Porcentaje del sueldo asignado', formatearPorcentaje(resumen.porcentajeAsignado), resumen.porcentajeAsignado === 100 ? 'Todo el sueldo tiene un destino' : 'Aún queda sueldo sin destino asignado'],
+            ['Tasa de ahorro real', formatearPorcentaje(resumen.porcentajeAhorroReal), 'Ahorro + inversión + excedente sobre el ingreso'],
+            ['Número de partidas activas', resumen.numeroPartidas, 'Partidas vigentes en el mes 1'],
+            [],
+            ['PROYECCIÓN A 6 MESES'],
+            ['Ingresos acumulados', moneda(totales.ingresosCent), 'Suma de los seis meses'],
+            ['Consumo acumulado', moneda(totales.consumoCent), 'Gasto corriente total'],
+            ['Ahorro acumulado', moneda(totales.ahorroCent), 'Colchón al final del periodo'],
+            ['Inversión acumulada', moneda(totales.inversionCent), 'Capital invertido al final del periodo'],
+            ['Patrimonio total', moneda(totales.patrimonioCent), 'Ahorro + inversión acumulados'],
+            [],
+            ['ESTRATEGIA DE EFECTIVO'],
+            [resumen.analisisEfectivo.recomendacion]
         ];
 
-        const hoja = XLSX.utils.aoa_to_sheet(filasDatos);
-        hoja['!cols'] = [{ wch: 32 }, { wch: 24 }, { wch: 50 }];
-        return hoja;
+        return this.prepararHoja(filas, [{ wch: 34 }, { wch: 20 }, { wch: 62 }]);
     }
 }

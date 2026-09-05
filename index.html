@@ -1,787 +1,818 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-tema="oscuro">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Presupuesto Personal Inteligente | Calculadora Automática Bicanal</title>
-    <meta name="description" content="Calculadora de presupuesto personal bicanal (Cuenta Bancaria vs. Efectivo Físico/B), control diario de gastos por lugar, estrategia anti-inflación y exportador a Excel (.xlsx).">
-    
-    <!-- Estilos de Diseño Dark Luxury Glassmorphism -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Presupuesto Personal Inteligente | Calculadora Bicanal Banco y Efectivo</title>
+    <meta name="description" content="Calculadora de presupuesto personal bicanal (cuenta bancaria y efectivo), control diario de gastos por lugar, sobres digitales, proyección a 6 meses y exportación a Excel. Cálculos exactos al céntimo y 100% privados en tu navegador.">
+    <meta name="color-scheme" content="dark light">
+    <meta name="theme-color" content="#070a12" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)">
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="estilos.css">
 
-    <!-- Librerías Externas 100% Compatibles con GitHub Pages (CDN) -->
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Tema aplicado antes del primer pintado para evitar el parpadeo de color -->
+    <script>
+        (function aplicarTemaInicial() {
+            try {
+                var guardado = localStorage.getItem('presupuesto_tema');
+                var prefiereClaro = window.matchMedia('(prefers-color-scheme: light)').matches;
+                var tema = guardado || (prefiereClaro ? 'claro' : 'oscuro');
+                document.documentElement.setAttribute('data-tema', tema);
+            } catch (error) {
+                document.documentElement.setAttribute('data-tema', 'oscuro');
+            }
+        })();
+    </script>
+
+    <!-- Librerías externas con versión fijada (compatibles con GitHub Pages) -->
+    <script defer src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.454.0/dist/umd/lucide.min.js"></script>
 </head>
 <body>
-    <div class="contenedor-aplicacion">
+    <div class="marco-app">
 
-        <!-- CABECERA PRINCIPAL -->
-        <header class="barra-superior">
-            <div class="bloque-marca">
-                <div class="icono-logo">
-                    <i data-lucide="wallet-cards" style="width: 28px; height: 28px;"></i>
+        <!-- ============================= CABECERA ============================= -->
+        <header class="cabecera-app">
+            <div class="marca">
+                <div class="logo-app" aria-hidden="true">
+                    <i data-lucide="wallet-cards"></i>
                 </div>
-                <div>
-                    <h1 class="titulo-aplicacion">Presupuesto Personal Inteligente</h1>
-                    <div class="subtitulo-aplicacion">
-                        <span>Control Bicanal y Gastos por Lugar</span>
-                        <span>•</span>
-                        <span id="insignia-estado-actual" class="insignia-estado insignia-neutra">Sin Configurar</span>
-                    </div>
+                <div class="bloque-titulo">
+                    <h1 class="titulo-app">Presupuesto Inteligente</h1>
+                    <p class="subtitulo-app">
+                        <span class="texto-largo">Control bicanal y gastos por lugar</span>
+                        <span class="texto-largo" aria-hidden="true">•</span>
+                        <span id="insignia-estado" class="insignia">Sin configurar</span>
+                    </p>
                 </div>
             </div>
 
             <div class="acciones-cabecera">
-                <!-- Indicador de Guardado Local Seguro -->
-                <div class="insignia-persistencia-local" title="Tus datos se guardan automáticamente en tu navegador (100% privado y offline)">
-                    <i data-lucide="shield-check" style="width: 14px; height: 14px; color: #10b981;"></i>
-                    <span>Guardado local offline</span>
+                <div class="acciones-escritorio">
+                    <button type="button" id="boton-cargar-ejemplo" class="boton-cabecera" title="Cargar un caso práctico de 1.000 € en banco y 400 € en efectivo">
+                        <i data-lucide="file-text" aria-hidden="true"></i>
+                        Caso de ejemplo
+                    </button>
+                    <button type="button" id="boton-reiniciar" class="boton-cabecera" title="Vaciar todos los datos y empezar de cero">
+                        <i data-lucide="rotate-ccw" aria-hidden="true"></i>
+                        Nuevo
+                    </button>
+                    <button type="button" id="boton-exportar-copia" class="boton-cabecera" title="Descargar una copia de seguridad en JSON">
+                        <i data-lucide="download" aria-hidden="true"></i>
+                        Copia
+                    </button>
+                    <button type="button" id="boton-importar-copia" class="boton-cabecera" title="Restaurar una copia de seguridad desde un archivo JSON">
+                        <i data-lucide="upload" aria-hidden="true"></i>
+                        Restaurar
+                    </button>
+                    <button type="button" id="boton-exportar-excel" class="boton boton--excel" title="Descargar el presupuesto completo en Excel">
+                        <i data-lucide="file-spreadsheet" aria-hidden="true"></i>
+                        Excel
+                    </button>
                 </div>
 
-                <!-- Botón Cargar Caso de Ejemplo -->
-                <button id="boton-cargar-ejemplo" class="boton-texto-accion" title="Cargar caso práctico de 1.400€ con análisis de comida y deudas">
-                    <i data-lucide="file-text" style="width: 16px; height: 16px; color: #38bdf8;"></i>
-                    Caso de Ejemplo (1.400€)
+                <button type="button" id="boton-tema" class="boton-cabecera" title="Cambiar entre tema claro y oscuro" aria-label="Cambiar tema">
+                    <i data-lucide="sun-moon" aria-hidden="true"></i>
                 </button>
 
-                <!-- Botón Reiniciar / Empezar en Blanco -->
-                <button id="boton-reiniciar-limpio" class="boton-texto-accion" title="Limpiar todos los datos y empezar de cero">
-                    <i data-lucide="rotate-ccw" style="width: 16px; height: 16px; color: #f87171;"></i>
-                    Nuevo Presupuesto
-                </button>
-
-                <!-- Botón Exportar Copia de Seguridad JSON -->
-                <button id="boton-exportar-backup" class="boton-texto-accion" title="Descargar copia de seguridad en JSON para transferir entre móvil y PC">
-                    <i data-lucide="download" style="width: 15px; height: 15px; color: #a78bfa;"></i>
-                    Copia (.json)
-                </button>
-
-                <!-- Botón Restaurar Copia JSON -->
-                <button id="boton-importar-backup" class="boton-texto-accion" title="Restaurar copia de seguridad desde un archivo JSON">
-                    <i data-lucide="upload" style="width: 15px; height: 15px; color: #fbbf24;"></i>
-                    Restaurar
-                </button>
-                <input type="file" id="input-archivo-backup" accept=".json" style="display: none;">
-
-                <!-- Botón Descargar Excel (.xlsx) -->
-                <button id="boton-exportar-excel" class="boton-excel" title="Descargar archivo Excel con formato profesional y 5 hojas de cálculo">
-                    <i data-lucide="file-spreadsheet" style="width: 18px; height: 18px;"></i>
-                    Exportar a Excel (.xlsx)
+                <button type="button" id="boton-menu-movil" class="boton-cabecera boton-menu-movil" aria-label="Abrir menú de acciones" aria-expanded="false" aria-controls="panel-acciones">
+                    <i data-lucide="menu" aria-hidden="true"></i>
                 </button>
             </div>
         </header>
 
-        <!-- ASISTENTE DE PRESUPUESTO INICIAL (ENTRADA DUAL: BANCO Y EFECTIVO / B) -->
-        <section class="tarjeta-asistente-inicial">
-            <div class="cabecera-asistente">
-                <h2 class="titulo-asistente">
-                    <i data-lucide="calculator" style="color: #10b981;"></i>
-                    Configura tus Ingresos Netos (Banco y Efectivo)
-                </h2>
-                <p class="descripcion-asistente">
-                    Introduce cuánto dinero limpio percibes en tu cuenta bancaria (nómina formal) y cuánto en efectivo físico en mano (propinas, extras o cobros en mano). El sistema cuadrará tus cuentas y diseñará la estrategia perfecta para gastar el efectivo sin perder valor por inflación.
-                </p>
-            </div>
+        <input type="file" id="input-archivo-copia" accept="application/json,.json" class="oculto">
 
-            <form id="formulario-asistente-sueldo">
-                <div class="rejilla-entradas-bicanal">
-                    <!-- Entrada 1: Dinero en Cuenta Bancaria -->
-                    <div class="bloque-entrada-canal foco-cuenta">
-                        <label for="input-sueldo-cuenta" class="etiqueta-asistente">
-                            <i data-lucide="landmark" style="width: 16px; height: 16px; color: #818cf8;"></i>
-                            Dinero en Cuenta Bancaria (€)
-                        </label>
-                        <div class="envoltorio-input-euro">
-                            <input type="number" id="input-sueldo-cuenta" placeholder="Ej. 1000" min="0" step="10" inputmode="decimal">
-                            <span class="simbolo-euro" style="color: #818cf8;">€</span>
-                        </div>
-                        <span style="font-size: 11px; color: var(--color-texto-apagado);">Nómina formal o transferencias bancarias oficiales</span>
-                    </div>
+        <main class="contenido-principal">
 
-                    <!-- Entrada 2: Dinero en Efectivo Físico / Mano -->
-                    <div class="bloque-entrada-canal foco-fisico">
-                        <label for="input-sueldo-fisico" class="etiqueta-asistente">
-                            <i data-lucide="banknote" style="width: 16px; height: 16px; color: #34d399;"></i>
-                            Dinero en Efectivo / Mano (€)
-                        </label>
-                        <div class="envoltorio-input-euro">
-                            <input type="number" id="input-sueldo-fisico" placeholder="Ej. 400" min="0" step="10" inputmode="decimal">
-                            <span class="simbolo-euro" style="color: #34d399;">€</span>
+            <!-- ================== ASISTENTE DE INGRESOS ================== -->
+            <details id="bloque-asistente" class="tarjeta" open>
+                <summary class="resumen-asistente">
+                    <span class="titulo-bloque">
+                        <i data-lucide="calculator" aria-hidden="true"></i>
+                        Configura tus ingresos netos
+                    </span>
+                    <span class="indicador-resumen" aria-hidden="true">
+                        <i data-lucide="chevron-down"></i>
+                    </span>
+                </summary>
+
+                <div class="cuerpo-asistente">
+                    <p class="descripcion-bloque">
+                        Indica cuánto dinero limpio recibes en tu cuenta bancaria y cuánto en efectivo físico.
+                        El sistema reparte tu sueldo al céntimo exacto y calcula qué pagar con tarjeta y qué en billetes.
+                    </p>
+
+                    <form id="formulario-ingresos" novalidate>
+                        <div class="rejilla-canales">
+                            <div class="bloque-canal bloque-canal--cuenta">
+                                <div class="campo">
+                                    <label class="etiqueta-campo" for="input-ingreso-cuenta">
+                                        <i data-lucide="landmark" aria-hidden="true"></i>
+                                        Dinero en cuenta bancaria
+                                    </label>
+                                    <div class="envoltorio-euro">
+                                        <input type="text" id="input-ingreso-cuenta" class="campo-monetario" placeholder="1000" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-describedby="ayuda-ingreso-cuenta">
+                                        <span class="simbolo-euro" aria-hidden="true">€</span>
+                                    </div>
+                                    <span class="ayuda-campo" id="ayuda-ingreso-cuenta">Nómina, transferencias o ingresos oficiales. Puedes escribir 1.234,56</span>
+                                </div>
+                            </div>
+
+                            <div class="bloque-canal bloque-canal--fisico">
+                                <div class="campo">
+                                    <label class="etiqueta-campo" for="input-ingreso-fisico">
+                                        <i data-lucide="banknote" aria-hidden="true"></i>
+                                        Dinero en efectivo / mano
+                                    </label>
+                                    <div class="envoltorio-euro">
+                                        <input type="text" id="input-ingreso-fisico" class="campo-monetario" placeholder="400" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-describedby="ayuda-ingreso-fisico">
+                                        <span class="simbolo-euro" aria-hidden="true">€</span>
+                                    </div>
+                                    <span class="ayuda-campo" id="ayuda-ingreso-fisico">Extras, propinas o cobros en billetes</span>
+                                </div>
+                            </div>
                         </div>
-                        <span style="font-size: 11px; color: var(--color-texto-apagado);">Dinero en mano / B, extras o propinas para consumo</span>
+
+                        <p class="resumen-vivo">
+                            <span>Sueldo neto total: <strong id="texto-total-vivo">0,00 €</strong></span>
+                            <span id="texto-reparto-vivo">0 % en banco • 0 % en efectivo</span>
+                        </p>
+
+                        <div class="fila-perfil">
+                            <div class="campo">
+                                <label class="etiqueta-campo" for="selector-perfil">
+                                    <i data-lucide="compass" aria-hidden="true"></i>
+                                    Situación de vida
+                                </label>
+                                <select id="selector-perfil" class="control">
+                                    <option value="VIVIENDO_PADRES">🏠 Viviendo con mis padres (aportación al hogar)</option>
+                                    <option value="INDEPENDIENTE_ALQUILER">🔑 Independiente / alquiler</option>
+                                    <option value="REGLA_50_30_20">⚖️ Regla clásica 50 / 30 / 20</option>
+                                    <option value="MAXIMO_AHORRO">🚀 Ahorro agresivo (70 % ahorro e inversión)</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="boton boton--primario boton--ancho">
+                                <i data-lucide="sparkles" aria-hidden="true"></i>
+                                Calcular mi presupuesto
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="pie-asistente">
+                        <span id="texto-perfil" class="texto-ayuda-perfil">
+                            Gastos fijos bajos. Ideal para liquidar deudas, acumular colchón y maximizar la inversión.
+                        </span>
+                        <button type="button" id="enlace-ejemplo" class="enlace-suave">
+                            <i data-lucide="lightbulb" aria-hidden="true"></i>
+                            Ver caso práctico
+                        </button>
                     </div>
                 </div>
+            </details>
 
-                <!-- Resumen en vivo de la suma total bicanal -->
-                <div id="resumen-bicanal-vivo" class="resumen-ingreso-bicanal">
-                    <span>Sueldo Neto Total Calculado: <strong id="texto-total-neto-vivo" style="color: #38bdf8; font-size: 16px;">0,00 €</strong></span>
-                    <span id="texto-porcentaje-bicanal" style="color: var(--color-texto-secundario);">0% en Banco • 0% en Efectivo</span>
+            <!-- ================== MÉTRICAS PRINCIPALES ================== -->
+            <section class="rejilla-metricas" aria-label="Resumen del mes">
+                <article class="tarjeta-metrica tarjeta-metrica--ingreso tarjeta-metrica--destacada">
+                    <div class="cabecera-metrica">
+                        <span class="etiqueta-metrica">Ingreso neto total</span>
+                        <span class="icono-metrica" aria-hidden="true"><i data-lucide="coins"></i></span>
+                    </div>
+                    <p id="metrica-ingreso" class="valor-metrica valor-metrica--neutro">0,00 €</p>
+                    <p class="subtitulo-metrica">
+                        <i data-lucide="calendar" aria-hidden="true"></i>
+                        <span id="detalle-ingreso">Cuenta + efectivo</span>
+                    </p>
+                </article>
+
+                <article class="tarjeta-metrica tarjeta-metrica--cuenta">
+                    <div class="cabecera-metrica">
+                        <span class="etiqueta-metrica">Gasto en banco</span>
+                        <span class="icono-metrica" aria-hidden="true"><i data-lucide="landmark"></i></span>
+                    </div>
+                    <p id="metrica-cuenta" class="valor-metrica valor-metrica--neutro">0,00 €</p>
+                    <p class="subtitulo-metrica">
+                        <i data-lucide="credit-card" aria-hidden="true"></i>
+                        <span id="detalle-cuenta">Recibos y domiciliaciones</span>
+                    </p>
+                </article>
+
+                <article class="tarjeta-metrica tarjeta-metrica--fisico">
+                    <div class="cabecera-metrica">
+                        <span class="etiqueta-metrica">Gasto en efectivo</span>
+                        <span class="icono-metrica" aria-hidden="true"><i data-lucide="banknote"></i></span>
+                    </div>
+                    <p id="metrica-fisico" class="valor-metrica valor-metrica--neutro">0,00 €</p>
+                    <p class="subtitulo-metrica">
+                        <i data-lucide="wallet" aria-hidden="true"></i>
+                        <span id="detalle-fisico">Consumo en billetes</span>
+                    </p>
+                </article>
+
+                <article class="tarjeta-metrica tarjeta-metrica--ahorro">
+                    <div class="cabecera-metrica">
+                        <span class="etiqueta-metrica">Ahorro e inversión</span>
+                        <span class="icono-metrica" aria-hidden="true"><i data-lucide="trending-up"></i></span>
+                    </div>
+                    <p id="metrica-ahorro" class="valor-metrica valor-metrica--neutro">0,00 €</p>
+                    <p class="subtitulo-metrica">
+                        <i data-lucide="piggy-bank" aria-hidden="true"></i>
+                        <span id="detalle-ahorro">Patrimonio construido este mes</span>
+                    </p>
+                </article>
+
+                <article class="tarjeta-metrica tarjeta-metrica--balance">
+                    <div class="cabecera-metrica">
+                        <span class="etiqueta-metrica">Balance / cuadre</span>
+                        <span class="icono-metrica" aria-hidden="true"><i data-lucide="scale"></i></span>
+                    </div>
+                    <p id="metrica-balance" class="valor-metrica valor-metrica--neutro">0,00 €</p>
+                    <p class="subtitulo-metrica">
+                        <i data-lucide="check-circle" aria-hidden="true"></i>
+                        <span id="detalle-balance">Cuentas cuadradas al céntimo</span>
+                    </p>
+                </article>
+            </section>
+
+            <!-- ================== AVISO DIDÁCTICO ================== -->
+            <section id="aviso-didactico" class="aviso aviso--neutro" aria-live="polite"></section>
+
+            <!-- ================== DISTRIBUCIÓN DEL SUELDO ================== -->
+            <section id="bloque-distribucion" class="tarjeta oculto" aria-label="Distribución del sueldo">
+                <div class="cabecera-bloque">
+                    <h2 class="titulo-bloque">
+                        <i data-lucide="pie-chart" aria-hidden="true"></i>
+                        Distribución del sueldo
+                    </h2>
+                    <span id="etiqueta-asignado" class="insignia insignia--exito">100 % asignado</span>
                 </div>
+                <div id="barra-distribucion" class="barra-distribucion" role="img" aria-label="Reparto porcentual por categorías"></div>
+                <div id="leyenda-distribucion" class="leyenda-distribucion"></div>
+            </section>
 
-                <div class="fila-configuracion-perfil">
-                    <div class="grupo-seleccion-perfil">
-                        <label for="selector-perfil-vida" class="etiqueta-asistente">
-                            <i data-lucide="compass" style="width: 15px; height: 15px; color: #6366f1;"></i>
-                            Situación de Vida / Perfil
-                        </label>
-                        <select id="selector-perfil-vida" class="selector-perfil-estilo">
-                            <option value="VIVIENDO_PADRES" selected>🏠 Viviendo con mis padres (Aportación al hogar + Ahorro explosivo)</option>
-                            <option value="INDEPENDIENTE_ALQUILER">🔑 Viviendo independiente / Alquiler (Vivienda, comida y suministros)</option>
-                            <option value="REGLA_50_30_20">⚖️ Regla Clásica 50 / 30 / 20 (50% Básicos, 30% Ocio, 20% Ahorro)</option>
-                            <option value="MAXIMO_AHORRO">🚀 Modo Ahorro Agresivo (Gastos mínimos, 70% Ahorro e Inversión)</option>
-                        </select>
+            <!-- ================== PESTAÑAS (ESCRITORIO) ================== -->
+            <nav class="navegacion-pestanas" role="tablist" aria-label="Secciones de la aplicación">
+                <button type="button" class="boton-pestana" role="tab" aria-selected="true" aria-controls="panel-gastos" data-pestana="panel-gastos">
+                    <i data-lucide="list-checks" aria-hidden="true"></i>
+                    Partidas del presupuesto
+                </button>
+                <button type="button" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-lugares" data-pestana="panel-lugares">
+                    <i data-lucide="store" aria-hidden="true"></i>
+                    Sobres y gastos diarios
+                </button>
+                <button type="button" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-canales" data-pestana="panel-canales">
+                    <i data-lucide="arrow-left-right" aria-hidden="true"></i>
+                    Banco vs. efectivo
+                </button>
+                <button type="button" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-excel" data-pestana="panel-excel">
+                    <i data-lucide="table-2" aria-hidden="true"></i>
+                    Proyección 6 meses
+                </button>
+                <button type="button" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-graficos" data-pestana="panel-graficos">
+                    <i data-lucide="bar-chart-3" aria-hidden="true"></i>
+                    Gráficos
+                </button>
+                <button type="button" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-inversiones" data-pestana="panel-inversiones">
+                    <i data-lucide="trending-up" aria-hidden="true"></i>
+                    Inversión y APIs
+                </button>
+            </nav>
+
+            <!-- ================== PANEL 1: PARTIDAS ================== -->
+            <section id="panel-gastos" class="panel-contenido activo" role="tabpanel" tabindex="-1" aria-label="Partidas del presupuesto">
+                <div class="barra-herramientas">
+                    <div class="grupo-filtros">
+                        <div class="campo">
+                            <label class="etiqueta-campo" for="selector-mes">Mes</label>
+                            <select id="selector-mes" class="control">
+                                <option value="1">Mes 1 (actual)</option>
+                                <option value="2">Mes 2</option>
+                                <option value="3">Mes 3</option>
+                                <option value="4">Mes 4</option>
+                                <option value="5">Mes 5</option>
+                                <option value="6">Mes 6</option>
+                            </select>
+                        </div>
+                        <div class="campo">
+                            <label class="etiqueta-campo" for="selector-canal-filtro">Canal</label>
+                            <select id="selector-canal-filtro" class="control">
+                                <option value="TODOS">Todos</option>
+                                <option value="CUENTA">Solo banco</option>
+                                <option value="FISICO">Solo efectivo</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <button type="submit" class="boton-calcular-automatico">
-                        <i data-lucide="sparkles" style="width: 18px; height: 18px;"></i>
-                        Calcular Mi Presupuesto
+                    <button type="button" id="boton-nueva-partida" class="boton boton--primario">
+                        <i data-lucide="plus-circle" aria-hidden="true"></i>
+                        Añadir partida
                     </button>
                 </div>
-            </form>
 
-            <div class="pie-asistente-ejemplos">
-                <span id="texto-explicativo-perfil" class="texto-ayuda-perfil">
-                    Perfil seleccionado: Gastos fijos bajos. Ideal para liquidar deudas, acumular colchón y maximizar inversión.
-                </span>
-                <button type="button" id="enlace-rapido-ejemplo" class="enlace-ejemplo-rapido">
-                    💡 Ver caso práctico (1.000€ cuenta + 400€ efectivo)
-                </button>
-            </div>
-        </section>
-
-        <!-- TARJETA ESTRATÉGICA: CANALIZACIÓN DE EFECTIVO Y BLINDAJE ANTI-INFLACIÓN -->
-        <section id="tarjeta-estrategia-efectivo-bloque" class="tarjeta-estrategia-efectivo" style="display: none;">
-            <div class="cabecera-estrategia">
-                <div class="titulo-estrategia">
-                    <i data-lucide="shield-check" style="color: #eab308; width: 22px; height: 22px;"></i>
-                    Estrategia Financiera: Cómo Gastar el Efectivo sin Perder Dinero
+                <div class="envoltorio-tabla">
+                    <table class="tabla tabla-adaptativa">
+                        <caption class="solo-lectores">Partidas de presupuesto del mes seleccionado</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">Concepto</th>
+                                <th scope="col">Categoría</th>
+                                <th scope="col">Canal de pago</th>
+                                <th scope="col">Importe</th>
+                                <th scope="col">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpo-tabla-partidas"></tbody>
+                    </table>
                 </div>
-                <span class="insignia-estrategia">Optimización Fiscal & Anti-Inflación</span>
-            </div>
+            </section>
 
-            <p id="parrafo-estrategia-personalizada" style="font-size: 14px; color: #e2e8f0; line-height: 1.6; margin-bottom: 14px;">
-                <!-- Rellenado dinámicamente con JS -->
-            </p>
-
-            <div class="rejilla-claves-estrategia">
-                <div class="caja-clave-estrategia">
-                    <h4><i data-lucide="shopping-cart" style="width: 16px; height: 16px; color: #10b981;"></i> Técnica de Sustitución</h4>
-                    <p>Paga el 100% de supermercado, gasolina, salidas y comida en efectivo. Al no usar tarjeta en esas compras, tu nómina bancaria se conserva intacta.</p>
-                </div>
-                <div class="caja-clave-estrategia">
-                    <h4><i data-lucide="trending-up" style="width: 16px; height: 16px; color: #38bdf8;"></i> Blindaje de Inversión</h4>
-                    <p>Como tu dinero bancarizado oficial no se gastó en el súper, puedes transferirlo legalmente a fondos indexados o cuentas remuneradas al 7%-10% anual.</p>
-                </div>
-                <div class="caja-clave-estrategia">
-                    <h4><i data-lucide="alert-octagon" style="width: 16px; height: 16px; color: #f87171;"></i> Seguridad con Hacienda</h4>
-                    <p>Nunca ingreses fajos en cajeros. En España los bancos alertan a Hacienda en ingresos continuos o superiores a 1.000€. Gástalo en consumo corriente.</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- BARRA VISUAL DE DISTRIBUCIÓN DEL SUELDO (100%) -->
-        <section id="seccion-distribucion-sueldo" class="seccion-barra-distribucion" style="display: none;">
-            <div class="cabecera-distribucion">
-                <div class="titulo-distribucion">
-                    <i data-lucide="pie-chart" style="width: 18px; height: 18px; color: #06b6d4;"></i>
-                    Distribución Porcentual del Sueldo
-                </div>
-                <span id="etiqueta-porcentaje-total" class="porcentaje-asignado-texto" style="color: #34d399;">
-                    100% Asignado
-                </span>
-            </div>
-
-            <div id="barra-progreso-segmentada" class="contenedor-barra-progreso">
-                <!-- Segmentos coloreados inyectados con JS -->
-            </div>
-
-            <div id="leyenda-distribucion-categorias" class="leyenda-distribucion">
-                <!-- Leyenda inyectada con JS -->
-            </div>
-        </section>
-
-        <!-- TARJETA AVISO DIDÁCTICO -->
-        <section id="tarjeta-aviso-didactico" class="tarjeta-aviso-didactico modo-neutro">
-            <!-- Rellenado dinámicamente -->
-        </section>
-
-        <!-- REJILLA DE TARJETAS MÉTRICAS (KPIS) -->
-        <section class="rejilla-metricas">
-            <!-- KPI 1: Ingreso Activo -->
-            <div class="tarjeta-metrica metrica-ingreso">
-                <div class="cabecera-metrica">
-                    <span class="etiqueta-metrica">Ingreso Neto Total</span>
-                    <div class="icono-metrica">
-                        <i data-lucide="coins" style="width: 20px; height: 20px;"></i>
-                    </div>
-                </div>
-                <div id="metrica-ingreso-valor" class="valor-metrica">0,00 €</div>
-                <div class="subtitulo-metrica">
-                    <i data-lucide="calendar" style="width: 13px; height: 13px;"></i>
-                    <span id="subtitulo-ingreso-texto">Cuenta + Efectivo</span>
-                </div>
-            </div>
-
-            <!-- KPI 2: Cuenta Bancaria -->
-            <div class="tarjeta-metrica metrica-cuenta">
-                <div class="cabecera-metrica">
-                    <span class="etiqueta-metrica">En Cuenta Bancaria</span>
-                    <div class="icono-metrica">
-                        <i data-lucide="landmark" style="width: 20px; height: 20px;"></i>
-                    </div>
-                </div>
-                <div id="metrica-cuenta-valor" class="valor-metrica">0,00 €</div>
-                <div class="subtitulo-metrica">
-                    <i data-lucide="credit-card" style="width: 13px; height: 13px;"></i>
-                    <span>Cargos, recibos y saldo libre</span>
-                </div>
-            </div>
-
-            <!-- KPI 3: Efectivo Físico -->
-            <div class="tarjeta-metrica metrica-fisico">
-                <div class="cabecera-metrica">
-                    <span class="etiqueta-metrica">Gasto en Efectivo</span>
-                    <div class="icono-metrica">
-                        <i data-lucide="banknote" style="width: 20px; height: 20px;"></i>
-                    </div>
-                </div>
-                <div id="metrica-fisico-valor" class="valor-metrica">0,00 €</div>
-                <div class="subtitulo-metrica">
-                    <i data-lucide="wallet" style="width: 13px; height: 13px;"></i>
-                    <span id="subtitulo-fisico-texto">Consumo en billetes físicos</span>
-                </div>
-            </div>
-
-            <!-- KPI 4: Ahorro e Inversión Total -->
-            <div class="tarjeta-metrica metrica-ahorro">
-                <div class="cabecera-metrica">
-                    <span class="etiqueta-metrica">Ahorro e Inversión</span>
-                    <div class="icono-metrica">
-                        <i data-lucide="trending-up" style="width: 20px; height: 20px;"></i>
-                    </div>
-                </div>
-                <div id="metrica-ahorro-valor" class="valor-metrica">0,00 €</div>
-                <div class="subtitulo-metrica">
-                    <i data-lucide="piggy-bank" style="width: 13px; height: 13px;"></i>
-                    <span>Construcción de patrimonio mensual</span>
-                </div>
-            </div>
-
-            <!-- KPI 5: Balance Libre / Cuadre -->
-            <div class="tarjeta-metrica metrica-balance">
-                <div class="cabecera-metrica">
-                    <span class="etiqueta-metrica">Balance / Cuadre</span>
-                    <div class="icono-metrica">
-                        <i data-lucide="scale" style="width: 20px; height: 20px;"></i>
-                    </div>
-                </div>
-                <div id="metrica-balance-valor" class="valor-metrica">0,00 €</div>
-                <div class="subtitulo-metrica">
-                    <i data-lucide="check-circle" style="width: 13px; height: 13px;"></i>
-                    <span id="subtitulo-balance-texto">Cuentas cuadradas al céntimo</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- NAVEGACIÓN POR PESTAÑAS -->
-        <nav class="navegacion-pestanas">
-            <button class="boton-pestana activa" data-pestana="panel-gastos">
-                <i data-lucide="list-checks" style="width: 18px; height: 18px;"></i>
-                Gestión y Cuadre de Partidas
-            </button>
-            <button class="boton-pestana" data-pestana="panel-lugares">
-                <i data-lucide="store" style="width: 18px; height: 18px; color: #06b6d4;"></i>
-                Control Diario por Lugares (Sobres)
-            </button>
-            <button class="boton-pestana" data-pestana="panel-canales">
-                <i data-lucide="arrow-left-right" style="width: 18px; height: 18px;"></i>
-                Cuenta Bancaria vs. Efectivo Físico
-            </button>
-            <button class="boton-pestana" data-pestana="panel-excel">
-                <i data-lucide="table-2" style="width: 18px; height: 18px;"></i>
-                Proyección 6 Meses (Estilo Excel)
-            </button>
-            <button class="boton-pestana" data-pestana="panel-graficos">
-                <i data-lucide="bar-chart-3" style="width: 18px; height: 18px;"></i>
-                Gráficos y Visualización
-            </button>
-            <button class="boton-pestana" data-pestana="panel-inversiones">
-                <i data-lucide="trending-up" style="width: 18px; height: 18px; color: #10b981;"></i>
-                Inversiones y APIs Gratuitas
-            </button>
-        </nav>
-
-        <!-- PESTAÑA 1: GESTIÓN Y CUADRE DE GASTOS -->
-        <div id="panel-gastos" class="panel-contenido activo">
-            <div class="barra-herramientas">
-                <div class="grupo-filtros">
-                    <span class="etiqueta-filtro">Ver Mes:</span>
-                    <select id="selector-mes-activo" class="selector-filtro">
-                        <option value="1">Mes 1 (Inicio)</option>
-                        <option value="2">Mes 2</option>
-                        <option value="3">Mes 3</option>
-                        <option value="4">Mes 4</option>
-                        <option value="5">Mes 5</option>
-                        <option value="6">Mes 6</option>
-                    </select>
-
-                    <span class="etiqueta-filtro" style="margin-left: 12px;">Filtrar Canal:</span>
-                    <select id="selector-filtro-canal" class="selector-filtro">
-                        <option value="TODOS">Todos los Canales</option>
-                        <option value="CUENTA">Solo Cuenta Bancaria</option>
-                        <option value="FISICO">Solo Efectivo Físico</option>
-                    </select>
-                </div>
-
-                <button id="boton-abrir-modal-gasto" class="boton-primario">
-                    <i data-lucide="plus-circle" style="width: 17px; height: 17px;"></i>
-                    Añadir Nueva Partida
-                </button>
-            </div>
-
-            <div class="contenedor-tabla">
-                <table class="tabla-datos">
-                    <thead>
-                        <tr>
-                            <th>Concepto & Descripción</th>
-                            <th>Categoría</th>
-                            <th>Canal de Pago (Haz clic para alternar)</th>
-                            <th>Importe (€)</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="cuerpo-tabla-gastos">
-                        <!-- Inyectado dinámicamente -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- PESTAÑA 2: NUEVO APARTADO - CONTROL DIARIO POR LUGARES (SISTEMA DE SOBRES DIGITALES) -->
-        <div id="panel-lugares" class="panel-contenido">
-            <div class="seccion-control-lugares">
-
-                <!-- Tarjeta Hucha de Dinero Salvado para Ahorro -->
-                <div class="tarjeta-hucha-ahorro">
+            <!-- ================== PANEL 2: SOBRES Y GASTOS DIARIOS ================== -->
+            <section id="panel-lugares" class="panel-contenido" role="tabpanel" tabindex="-1" aria-label="Sobres digitales y gastos diarios">
+                <div class="tarjeta-hucha">
                     <div class="contenido-hucha">
                         <h3>
-                            <i data-lucide="piggy-bank" style="color: #34d399; width: 24px; height: 24px;"></i>
-                            Dinero Disponible que se Transfiere a tu Ahorro
+                            <i data-lucide="piggy-bank" aria-hidden="true"></i>
+                            Dinero que aún no has gastado
                         </h3>
                         <p>
-                            Al gastar menos de lo presupuestado en tus compras diarias, este remanente se salva automáticamente e incrementa tu patrimonio mensual.
+                            Lo que te queda libre en los sobres de comida, ocio y suscripciones.
+                            Si no lo gastas, engorda tu ahorro. Las deudas y las reservas no cuentan
+                            aquí: ese dinero ya está comprometido.
                         </p>
                     </div>
-                    <div id="valor-hucha-ahorro-acumulado" class="valor-hucha-destacado">+0,00 €</div>
+                    <p id="valor-hucha" class="valor-hucha">0,00 €</p>
                 </div>
 
-                <!-- Formulario Rápido: Anotar Gasto en Lugar/Comercio -->
-                <div class="panel-registro-compra-rapida">
-                    <div class="cabecera-registro-compra">
-                        <div class="titulo-registro-compra">
-                            <i data-lucide="plus-circle" style="color: #06b6d4;"></i>
-                            Anotar Gasto en un Lugar o Comercio
-                        </div>
-                        <span style="font-size: 13px; color: var(--color-texto-secundario);">
-                            Actualiza al instante el dinero que te queda para gastar en cada sobre
-                        </span>
+                <div class="tarjeta">
+                    <div class="cabecera-bloque">
+                        <h2 class="titulo-bloque">
+                            <i data-lucide="plus-circle" aria-hidden="true"></i>
+                            Anotar un gasto
+                        </h2>
+                        <span id="insignia-mes-sobres" class="insignia insignia--info">Mes 1</span>
                     </div>
 
-                    <form id="formulario-compra-lugar" class="formulario-compra-lugar">
-                        <!-- Campo Lugar con sugerencias datalist -->
-                        <div class="campo-formulario">
-                            <label for="input-lugar-compra">Lugar / Establecimiento</label>
-                            <input type="text" id="input-lugar-compra" list="lista-sugerencias-lugares" placeholder="Ej. Mercadona, Bar..." required>
-                            <datalist id="lista-sugerencias-lugares">
-                                <!-- Rellenado dinámicamente con JS -->
-                            </datalist>
+                    <form id="formulario-compra" class="formulario-compra" novalidate>
+                        <div class="campo campo--ancho">
+                            <label class="etiqueta-campo" for="input-lugar">Lugar o comercio</label>
+                            <input type="text" id="input-lugar" list="sugerencias-lugares" placeholder="Mercadona, bar, gasolinera…" autocomplete="off" required>
+                            <datalist id="sugerencias-lugares"></datalist>
                         </div>
 
-                        <!-- Campo Importe -->
-                        <div class="campo-formulario">
-                            <label for="input-importe-compra">Importe (€)</label>
-                            <input type="number" id="input-importe-compra" step="0.01" min="0.01" placeholder="0.00" inputmode="decimal" required>
+                        <div class="campo">
+                            <label class="etiqueta-campo" for="input-importe-compra">Importe</label>
+                            <div class="envoltorio-euro">
+                                <input type="text" id="input-importe-compra" class="campo-monetario" placeholder="0,00" inputmode="decimal" enterkeyhint="done" autocomplete="off" required>
+                                <span class="simbolo-euro" aria-hidden="true">€</span>
+                            </div>
                         </div>
 
-                        <!-- Campo Categoría -->
-                        <div class="campo-formulario">
-                            <label for="selector-categoria-compra">Categoría / Sobre</label>
-                            <select id="selector-categoria-compra">
-                                <option value="VIVIENDA_COMIDA">Comida y Aportación Hogar</option>
-                                <option value="OCIO_ESTILO_VIDA" selected>Ocio y Gastos Personales</option>
-                                <option value="DIGITAL_SUSCRIPCIONES">Suscripciones y Facturas</option>
-                                <option value="DEUDAS_OBLIGACIONES">Deudas y Obligaciones</option>
-                                <option value="PREVISION_RESERVAS">Previsión de Recibos / Fondo</option>
+                        <div class="campo">
+                            <label class="etiqueta-campo" for="selector-categoria-compra">Sobre / categoría</label>
+                            <select id="selector-categoria-compra" class="control"></select>
+                        </div>
+
+                        <div class="campo">
+                            <label class="etiqueta-campo" for="selector-canal-compra">¿Cómo lo pagaste?</label>
+                            <select id="selector-canal-compra" class="control">
+                                <option value="Efectivo Físico">Efectivo en mano</option>
+                                <option value="Cuenta Bancaria">Tarjeta o cuenta</option>
                             </select>
                         </div>
 
-                        <!-- Campo Medio de Pago -->
-                        <div class="campo-formulario">
-                            <label for="selector-canal-compra">¿Cómo lo pagaste?</label>
-                            <select id="selector-canal-compra">
-                                <option value="Efectivo Físico" selected>Efectivo Físico (Dinero en Mano / B)</option>
-                                <option value="Cuenta Bancaria">Cuenta Bancaria (Tarjeta / Débito)</option>
-                            </select>
-                        </div>
-
-                        <!-- Botón Enviar -->
-                        <button type="submit" class="boton-anotar-gasto">
-                            <i data-lucide="check" style="width: 16px; height: 16px;"></i>
-                            Anotar Gasto
+                        <button type="submit" class="boton boton--primario">
+                            <i data-lucide="check" aria-hidden="true"></i>
+                            Anotar
                         </button>
                     </form>
                 </div>
 
-                <!-- Rejilla de Sobres Digitales: Presupuesto Disponible por Categoría -->
                 <div>
-                    <h3 style="font-family: var(--fuente-titulos); font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
-                        <i data-lucide="layers" style="color: #6366f1;"></i>
-                        Sobres Digitales: Dinero Disponible para Gastar
-                    </h3>
-                    <div id="cuerpo-sobres-presupuesto" class="rejilla-sobres-presupuesto">
-                        <!-- Inyectado dinámicamente con JS -->
+                    <div class="cabecera-bloque">
+                        <h2 class="titulo-bloque">
+                            <i data-lucide="layers" aria-hidden="true"></i>
+                            Sobres digitales
+                        </h2>
+                    </div>
+                    <div id="rejilla-sobres" class="rejilla-sobres"></div>
+                </div>
+
+                <div id="bloque-ranking" class="tarjeta oculto">
+                    <div class="cabecera-bloque">
+                        <h2 class="titulo-bloque">
+                            <i data-lucide="map-pin" aria-hidden="true"></i>
+                            Dónde se va tu dinero
+                        </h2>
+                    </div>
+                    <ul id="lista-ranking" class="lista-ranking"></ul>
+                </div>
+
+                <div>
+                    <div class="cabecera-bloque">
+                        <h2 class="titulo-bloque">
+                            <i data-lucide="history" aria-hidden="true"></i>
+                            Historial de gastos
+                        </h2>
+                        <span id="contador-transacciones" class="insignia">0 gastos</span>
+                    </div>
+
+                    <div class="envoltorio-tabla">
+                        <table class="tabla tabla-adaptativa">
+                            <caption class="solo-lectores">Gastos registrados en el mes seleccionado</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Fecha</th>
+                                    <th scope="col">Lugar</th>
+                                    <th scope="col">Categoría</th>
+                                    <th scope="col">Canal</th>
+                                    <th scope="col">Importe</th>
+                                    <th scope="col">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cuerpo-tabla-historial"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ================== PANEL 3: BANCO VS EFECTIVO ================== -->
+            <section id="panel-canales" class="panel-contenido" role="tabpanel" tabindex="-1" aria-label="Comparativa entre cuenta bancaria y efectivo">
+                <div id="tarjeta-estrategia" class="tarjeta tarjeta-estrategia oculto">
+                    <div class="cabecera-bloque">
+                        <h2 class="titulo-bloque">
+                            <i data-lucide="shield-check" aria-hidden="true"></i>
+                            Cómo gastar el efectivo sin perder dinero
+                        </h2>
+                        <span class="insignia insignia--aviso">Anti-inflación</span>
+                    </div>
+
+                    <p id="parrafo-estrategia" class="parrafo-estrategia"></p>
+
+                    <div class="rejilla-claves">
+                        <div class="caja-clave">
+                            <h4><i data-lucide="shopping-cart" aria-hidden="true"></i> Técnica de sustitución</h4>
+                            <p>Paga supermercado, gasolina, salidas y comida en efectivo. Al no usar tarjeta en esas compras, tu nómina bancaria se conserva intacta.</p>
+                        </div>
+                        <div class="caja-clave">
+                            <h4><i data-lucide="trending-up" aria-hidden="true"></i> Blindaje de inversión</h4>
+                            <p>Como tu dinero bancarizado no se gastó en el súper, puedes transferirlo a fondos indexados o cuentas remuneradas.</p>
+                        </div>
+                        <div class="caja-clave">
+                            <h4><i data-lucide="alert-octagon" aria-hidden="true"></i> Seguridad bancaria</h4>
+                            <p>Nunca ingreses fajos en cajeros: en España los bancos avisan a Hacienda por ingresos repetidos o superiores a 1.000 €.</p>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Historial de Gastos y Compras Registradas -->
-                <div class="contenedor-historial-compras">
-                    <div class="cabecera-historial-compras">
-                        <div class="titulo-historial">
-                            <i data-lucide="history" style="color: #38bdf8;"></i>
-                            Historial de Gastos Registrados
+                <div class="rejilla-canales-desglose">
+                    <article class="tarjeta-canal tarjeta-canal--banco">
+                        <div class="cabecera-canal">
+                            <div>
+                                <h2 class="titulo-canal">
+                                    <i data-lucide="landmark" aria-hidden="true"></i>
+                                    Cuenta bancaria
+                                </h2>
+                                <p id="instruccion-cuenta" class="instruccion-canal">Dinero que se liquida directamente desde tu banco.</p>
+                            </div>
+                            <p id="total-cuenta" class="total-canal">0,00 €</p>
                         </div>
-                        <span id="contador-transacciones-registradas" style="font-size: 12px; color: var(--color-texto-secundario);">
-                            0 gastos registrados
-                        </span>
-                    </div>
 
-                    <table class="tabla-datos">
+                        <ul id="lista-partidas-cuenta" class="lista-partidas-canal"></ul>
+
+                        <p class="caja-resumen-canal">
+                            <strong>Estrategia de banco:</strong>
+                            mantén esta cantidad en la cuenta corriente para que nunca se rechacen domiciliaciones, recibos ni suscripciones.
+                        </p>
+                    </article>
+
+                    <article class="tarjeta-canal tarjeta-canal--efectivo">
+                        <div class="cabecera-canal">
+                            <div>
+                                <h2 class="titulo-canal">
+                                    <i data-lucide="banknote" aria-hidden="true"></i>
+                                    Efectivo físico
+                                </h2>
+                                <p id="instruccion-fisico" class="instruccion-canal">Gastos pagados en billetes para absorber el dinero en mano.</p>
+                            </div>
+                            <p id="total-fisico" class="total-canal">0,00 €</p>
+                        </div>
+
+                        <ul id="lista-partidas-fisico" class="lista-partidas-canal"></ul>
+
+                        <p class="caja-resumen-canal">
+                            <strong>Absorción inteligente:</strong>
+                            al pagar súper, gasolina y ocio con el efectivo en mano, proteges tu dinero bancario para invertirlo a largo plazo.
+                        </p>
+                    </article>
+                </div>
+            </section>
+
+            <!-- ================== PANEL 4: PROYECCIÓN ================== -->
+            <section id="panel-excel" class="panel-contenido" role="tabpanel" tabindex="-1" aria-label="Proyección financiera a seis meses">
+                <div class="cabecera-bloque">
+                    <h2 class="titulo-bloque">
+                        <i data-lucide="sheet" aria-hidden="true"></i>
+                        Proyección a 6 meses
+                    </h2>
+                    <button type="button" id="boton-excel-proyeccion" class="boton boton--excel">
+                        <i data-lucide="file-spreadsheet" aria-hidden="true"></i>
+                        Exportar a Excel
+                    </button>
+                </div>
+
+                <div class="envoltorio-tabla">
+                    <table class="tabla tabla-adaptativa tabla-proyeccion">
+                        <caption class="solo-lectores">Evolución mensual de ingresos, gastos y patrimonio</caption>
                         <thead>
                             <tr>
-                                <th>Fecha</th>
-                                <th>Lugar / Establecimiento</th>
-                                <th>Categoría</th>
-                                <th>Canal de Pago</th>
-                                <th>Importe (€)</th>
-                                <th>Acción</th>
+                                <th scope="col">Mes</th>
+                                <th scope="col">Ingreso</th>
+                                <th scope="col">Gastos fijos</th>
+                                <th scope="col">Deudas</th>
+                                <th scope="col">Consumo total</th>
+                                <th scope="col">Sobrante</th>
+                                <th scope="col">Ahorro mes</th>
+                                <th scope="col">Inversión mes</th>
+                                <th scope="col">Ahorro acum.</th>
+                                <th scope="col">Inversión acum.</th>
+                                <th scope="col">Patrimonio</th>
                             </tr>
                         </thead>
-                        <tbody id="cuerpo-historial-transacciones">
-                            <!-- Inyectado con JS -->
-                        </tbody>
+                        <tbody id="cuerpo-tabla-proyeccion"></tbody>
                     </table>
                 </div>
+            </section>
 
-            </div>
-        </div>
-
-        <!-- PESTAÑA 3: CUENTA BANCARIA VS. EFECTIVO FÍSICO -->
-        <div id="panel-canales" class="panel-contenido">
-            <div class="seccion-comparador-canales">
-                <!-- Columna Cuenta Bancaria -->
-                <div class="tarjeta-canal-desglose canal-banco-tarjeta">
-                    <div class="cabecera-tarjeta-canal">
-                        <div>
-                            <div class="titulo-canal-bloque">
-                                <i data-lucide="landmark" style="color: #818cf8;"></i>
-                                Cuenta Bancaria (Pagos con Tarjeta y Domiciliación)
-                            </div>
-                            <p class="instruccion-cajero">Dinero que se liquida directamente desde tu banco</p>
+            <!-- ================== PANEL 5: GRÁFICOS ================== -->
+            <section id="panel-graficos" class="panel-contenido" role="tabpanel" tabindex="-1" aria-label="Gráficos y visualización">
+                <div class="rejilla-graficos">
+                    <div class="tarjeta-grafico">
+                        <h2 class="titulo-grafico">
+                            <i data-lucide="pie-chart" aria-hidden="true"></i>
+                            Gastos por categoría
+                        </h2>
+                        <div class="contenedor-lienzo">
+                            <canvas id="grafico-categorias" aria-label="Reparto de gastos por categoría" role="img"></canvas>
                         </div>
-                        <div id="total-destacado-cuenta" class="total-destacado-canal">0,00 €</div>
                     </div>
 
-                    <ul id="lista-partidas-cuenta" class="lista-partidas-canal">
-                        <!-- Rellenado con JS -->
-                    </ul>
-
-                    <div class="resumen-operativo-caja">
-                        <strong style="color: #a5b4fc;">Estrategia de Banco:</strong>
-                        Mantén esta cantidad en tu cuenta corriente para que nunca se rechacen las domiciliaciones, recibos ni suscripciones.
-                    </div>
-                </div>
-
-                <!-- Columna Efectivo Físico -->
-                <div class="tarjeta-canal-desglose canal-efectivo-tarjeta">
-                    <div class="cabecera-tarjeta-canal">
-                        <div>
-                            <div class="titulo-canal-bloque">
-                                <i data-lucide="banknote" style="color: #34d399;"></i>
-                                Efectivo Físico (Consumo en Mano / B)
-                            </div>
-                            <p id="instruccion-canal-fisico" class="instruccion-cajero">Gastos pagados en billetes físicos para absorber el dinero en mano</p>
+                    <div class="tarjeta-grafico">
+                        <h2 class="titulo-grafico">
+                            <i data-lucide="scale" aria-hidden="true"></i>
+                            Banco vs. efectivo
+                        </h2>
+                        <div class="contenedor-lienzo">
+                            <canvas id="grafico-canales" aria-label="Comparativa de gasto por canal de pago" role="img"></canvas>
                         </div>
-                        <div id="total-destacado-fisico" class="total-destacado-canal">0,00 €</div>
                     </div>
 
-                    <ul id="lista-partidas-fisico" class="lista-partidas-canal">
-                        <!-- Rellenado con JS -->
-                    </ul>
-
-                    <div class="resumen-operativo-caja">
-                        <strong style="color: #6ee7b7;">Absorción Inteligente:</strong>
-                        Al pagar la compra del súper, gasolina y ocio con tu efectivo en mano, proteges tu dinero oficial bancario para invertirlo a largo plazo.
+                    <div class="tarjeta-grafico tarjeta-grafico--ancha">
+                        <h2 class="titulo-grafico">
+                            <i data-lucide="trending-up" aria-hidden="true"></i>
+                            Patrimonio acumulado a 6 meses
+                        </h2>
+                        <div class="contenedor-lienzo contenedor-lienzo--alto">
+                            <canvas id="grafico-patrimonio" aria-label="Evolución del patrimonio acumulado" role="img"></canvas>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
+            </section>
 
-        <!-- PESTAÑA 4: PROYECCIÓN A 6 MESES (ESTILO EXCEL) -->
-        <div id="panel-excel" class="panel-contenido">
-            <div class="panel-excel-proyeccion">
-                <div class="cabecera-excel-info">
-                    <div class="titulo-hoja-excel">
-                        <i data-lucide="sheet" style="color: #10b981;"></i>
-                        Proyección Financiera a 6 Meses
-                    </div>
-                    <span style="font-size: 13px; color: var(--color-texto-secundario);">
-                        Evolución mensual, gastos controlados y acumulación de patrimonio
-                    </span>
-                </div>
-
-                <table class="tabla-excel-completa">
-                    <thead>
-                        <tr>
-                            <th>Mes</th>
-                            <th>Ingreso Neto</th>
-                            <th>Gastos Consumo</th>
-                            <th>Deudas Liquidadas</th>
-                            <th>Total Consumo</th>
-                            <th>Sobrante Libre</th>
-                            <th>Ahorro Mensual</th>
-                            <th>Inversión Mensual</th>
-                            <th>Ahorro Acum.</th>
-                            <th>Inversión Acum.</th>
-                            <th>Patrimonio Total</th>
-                        </tr>
-                    </thead>
-                    <tbody id="cuerpo-tabla-proyeccion-excel">
-                        <!-- Rellenado con JS -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- PESTAÑA 5: GRÁFICOS Y VISUALIZACIÓN -->
-        <div id="panel-graficos" class="panel-contenido">
-            <div class="rejilla-graficos">
-                <!-- Gráfico 1: Categorías -->
-                <div class="tarjeta-grafico">
-                    <div class="titulo-grafico">
-                        <i data-lucide="pie-chart" style="color: #06b6d4;"></i>
-                        Distribución de Gastos por Categoría
-                    </div>
-                    <div class="contenedor-lienzo">
-                        <canvas id="grafico-categorias"></canvas>
-                    </div>
-                </div>
-
-                <!-- Gráfico 2: Cuenta vs Físico -->
-                <div class="tarjeta-grafico">
-                    <div class="titulo-grafico">
-                        <i data-lucide="scale" style="color: #6366f1;"></i>
-                        Canal de Pago: Cuenta Bancaria vs. Efectivo Físico
-                    </div>
-                    <div class="contenedor-lienzo">
-                        <canvas id="grafico-canales"></canvas>
-                    </div>
-                </div>
-
-                <!-- Gráfico 3: Crecimiento Patrimonial -->
-                <div class="tarjeta-grafico tarjeta-grafico-ancho-completo">
-                    <div class="titulo-grafico">
-                        <i data-lucide="trending-up" style="color: #10b981;"></i>
-                        Proyección del Patrimonio Acumulado a 6 Meses (Ahorro + Inversión)
-                    </div>
-                    <div class="contenedor-lienzo-alto">
-                        <canvas id="grafico-patrimonio"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- PESTAÑA 6: INVERSIONES Y APIS GRATUITAS -->
-        <div id="panel-inversiones" class="panel-contenido">
-            <div class="panel-inversiones-seccion">
-                <div class="tarjeta-aviso-didactico modo-exito">
-                    <div class="icono-aviso">
-                        <i data-lucide="trending-up"></i>
-                    </div>
+            <!-- ================== PANEL 6: INVERSIÓN Y APIS ================== -->
+            <section id="panel-inversiones" class="panel-contenido" role="tabpanel" tabindex="-1" aria-label="Inversión y APIs gratuitas">
+                <div class="aviso aviso--exito">
+                    <span class="icono-aviso" aria-hidden="true"><i data-lucide="trending-up"></i></span>
                     <div class="contenido-aviso">
-                        <h3>📈 Cómo Invertir tu Dinero Limpio y APIs Gratuitas para Monitorear Costes</h3>
+                        <h3>Invierte el dinero que liberas en el banco</h3>
                         <p>
-                            Al pagar tu consumo diario en efectivo físico, tu dinero bancario queda <strong>100% legal y disponible</strong> para invertir en fondos indexados globales (tipo <strong>MSCI World</strong> o <strong>S&P 500</strong> a través de brókers como MyInvestor, DeGiro o Trade Republic).
-                            A continuación tienes las <strong>mejores APIs gratuitas</strong> para seguir costes (TER), cotizaciones en tiempo real y rentabilidades sin pagar un solo euro.
+                            Al pagar tu consumo diario en efectivo, el dinero de tu cuenta queda disponible para invertir
+                            en fondos indexados globales (<strong>MSCI World</strong> o <strong>S&amp;P 500</strong>) a través de brókers como
+                            MyInvestor, DeGiro o Trade Republic. Debajo tienes APIs gratuitas para seguir costes (TER),
+                            cotizaciones y rentabilidades sin pagar nada.
                         </p>
                     </div>
                 </div>
 
-                <div class="rejilla-apis-inversion">
-                    <!-- API 1: Yahoo Finance -->
-                    <div class="tarjeta-api-item">
-                        <div>
-                            <div class="cabecera-api">
-                                <span class="nombre-api">Yahoo Finance API</span>
-                                <span class="insignia-gratis">100% Gratis</span>
-                            </div>
-                            <p class="descripcion-api">
-                                Permite consultar cotizaciones históricas, precios en tiempo real y el ratio de costes totales (TER) de ETFs como VWCE, Vanguard S&P 500 o iShares MSCI World mediante endpoints JSON públicos directos.
-                            </p>
-                        </div>
-                        <a href="https://query1.finance.yahoo.com/v8/finance/chart/VWCE.DE" target="_blank" rel="noopener noreferrer" class="enlace-doc-api">
-                            <span>Ver Endpoint Ejemplo (VWCE)</span>
-                            <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
-                        </a>
-                    </div>
+                <div id="rejilla-apis" class="rejilla-apis"></div>
+            </section>
 
-                    <!-- API 2: Alpha Vantage -->
-                    <div class="tarjeta-api-item">
-                        <div>
-                            <div class="cabecera-api">
-                                <span class="nombre-api">Alpha Vantage</span>
-                                <span class="insignia-gratis">Tier Gratuito (25 req/día)</span>
-                            </div>
-                            <p class="descripcion-api">
-                                Especializada en series temporales ajustadas por dividendos y splits para ETFs y acciones globales. Ideal para calcular el crecimiento compuesto a 5 y 10 años.
-                            </p>
-                        </div>
-                        <a href="https://www.alphavantage.co/documentation/" target="_blank" rel="noopener noreferrer" class="enlace-doc-api">
-                            <span>Documentación Alpha Vantage</span>
-                            <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
-                        </a>
-                    </div>
-
-                    <!-- API 3: CoinGecko -->
-                    <div class="tarjeta-api-item">
-                        <div>
-                            <div class="cabecera-api">
-                                <span class="nombre-api">CoinGecko API</span>
-                                <span class="insignia-gratis">Pública sin API Key</span>
-                            </div>
-                            <p class="descripcion-api">
-                                Datos completos de precios, volumen y capitalización de criptomonedas (Bitcoin, Ethereum, etc.) sin necesidad de registrarte ni aportar tarjeta de crédito.
-                            </p>
-                        </div>
-                        <a href="https://www.coingecko.com/es/api" target="_blank" rel="noopener noreferrer" class="enlace-doc-api">
-                            <span>Documentación CoinGecko</span>
-                            <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
-                        </a>
-                    </div>
-
-                    <!-- API 4: Frankfurter (BCE) -->
-                    <div class="tarjeta-api-item">
-                        <div>
-                            <div class="cabecera-api">
-                                <span class="nombre-api">Frankfurter API (BCE)</span>
-                                <span class="insignia-gratis">Open Source Ilimitada</span>
-                            </div>
-                            <p class="descripcion-api">
-                                Rastrea los tipos de cambio oficiales del Banco Central Europeo. Esencial para calcular el impacto divisa (Euro/Dólar) en fondos indexados globales.
-                            </p>
-                        </div>
-                        <a href="https://www.frankfurter.app/" target="_blank" rel="noopener noreferrer" class="enlace-doc-api">
-                            <span>Documentación Frankfurter</span>
-                            <i data-lucide="external-link" style="width: 14px; height: 14px;"></i>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+            <footer class="pie-app">
+                <span>
+                    <i data-lucide="shield-check" aria-hidden="true"></i>
+                    Tus datos se guardan solo en este navegador
+                </span>
+                <span>
+                    <i data-lucide="calculator" aria-hidden="true"></i>
+                    Cálculos exactos al céntimo
+                </span>
+                <span id="pie-actualizacion"></span>
+            </footer>
+        </main>
     </div>
 
-    <!-- MODAL PARA AÑADIR / EDITAR PARTIDA -->
-    <div id="modal-gasto" class="fondo-modal">
+    <!-- ============================= NAVEGACIÓN INFERIOR MÓVIL ============================= -->
+    <nav class="nav-inferior" aria-label="Navegación principal">
+        <button type="button" class="item-nav" aria-selected="true" data-pestana="panel-gastos">
+            <i data-lucide="list-checks" aria-hidden="true"></i>
+            <span>Partidas</span>
+        </button>
+        <button type="button" class="item-nav" aria-selected="false" data-pestana="panel-lugares">
+            <i data-lucide="store" aria-hidden="true"></i>
+            <span>Sobres</span>
+        </button>
+        <button type="button" class="item-nav" aria-selected="false" data-pestana="panel-canales">
+            <i data-lucide="arrow-left-right" aria-hidden="true"></i>
+            <span>Bicanal</span>
+        </button>
+        <button type="button" class="item-nav" aria-selected="false" data-pestana="panel-excel">
+            <i data-lucide="table-2" aria-hidden="true"></i>
+            <span>Proyección</span>
+        </button>
+        <button type="button" class="item-nav" id="boton-mas-movil" aria-selected="false">
+            <i data-lucide="layout-grid" aria-hidden="true"></i>
+            <span>Más</span>
+        </button>
+    </nav>
+
+    <!-- ============================= BOTÓN FLOTANTE ============================= -->
+    <button type="button" id="boton-flotante" class="boton-flotante" aria-label="Anotar un gasto rápido">
+        <i data-lucide="plus" aria-hidden="true"></i>
+        <span>Gasto</span>
+    </button>
+
+    <!-- ============================= PANEL DE ACCIONES MÓVIL ============================= -->
+    <div id="velo-panel" class="velo-panel"></div>
+    <div id="panel-acciones" class="panel-acciones" role="dialog" aria-modal="true" aria-label="Menú de acciones">
+        <span class="asa-panel" aria-hidden="true"></span>
+
+        <p class="titulo-panel">Más secciones</p>
+        <button type="button" class="accion-panel" data-pestana="panel-graficos">
+            <i data-lucide="bar-chart-3" aria-hidden="true"></i>
+            <span>
+                Gráficos
+                <span class="detalle-accion">Categorías, canales y patrimonio</span>
+            </span>
+        </button>
+        <button type="button" class="accion-panel" data-pestana="panel-inversiones">
+            <i data-lucide="trending-up" aria-hidden="true"></i>
+            <span>
+                Inversión y APIs
+                <span class="detalle-accion">Fuentes gratuitas de cotizaciones</span>
+            </span>
+        </button>
+
+        <p class="titulo-panel">Tus datos</p>
+        <button type="button" class="accion-panel" data-accion="excel">
+            <i data-lucide="file-spreadsheet" aria-hidden="true"></i>
+            <span>
+                Exportar a Excel
+                <span class="detalle-accion">Libro .xlsx con 5 hojas</span>
+            </span>
+        </button>
+        <button type="button" class="accion-panel" data-accion="copia">
+            <i data-lucide="download" aria-hidden="true"></i>
+            <span>
+                Descargar copia
+                <span class="detalle-accion">Archivo .json para pasar a otro dispositivo</span>
+            </span>
+        </button>
+        <button type="button" class="accion-panel" data-accion="restaurar">
+            <i data-lucide="upload" aria-hidden="true"></i>
+            <span>
+                Restaurar copia
+                <span class="detalle-accion">Recupera tus partidas y gastos</span>
+            </span>
+        </button>
+        <button type="button" class="accion-panel" data-accion="ejemplo">
+            <i data-lucide="file-text" aria-hidden="true"></i>
+            <span>
+                Cargar caso de ejemplo
+                <span class="detalle-accion">1.000 € en banco + 400 € en efectivo</span>
+            </span>
+        </button>
+        <button type="button" class="accion-panel" data-accion="reiniciar">
+            <i data-lucide="rotate-ccw" aria-hidden="true"></i>
+            <span>
+                Empezar de cero
+                <span class="detalle-accion">Borra todos los datos guardados</span>
+            </span>
+        </button>
+    </div>
+
+    <!-- ============================= MODAL DE PARTIDA ============================= -->
+    <div id="modal-partida" class="fondo-modal" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-partida">
         <div class="caja-modal">
             <div class="cabecera-modal">
-                <h2 id="titulo-modal-gasto" class="titulo-modal">Añadir Nueva Partida</h2>
-                <button id="boton-cerrar-modal" class="boton-icono" type="button">
-                    <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                <h2 id="titulo-modal-partida" class="titulo-modal">Añadir partida</h2>
+                <button type="button" id="boton-cerrar-modal" class="boton-icono" aria-label="Cerrar">
+                    <i data-lucide="x" aria-hidden="true"></i>
                 </button>
             </div>
 
-            <form id="formulario-nuevo-gasto" class="formulario-gasto">
-                <div class="campo-formulario">
-                    <label for="campo-gasto-concepto">Concepto de la partida</label>
-                    <input type="text" id="campo-gasto-concepto" name="concepto" placeholder="Ej. Aportación casa, Suscripción, Ocio fin de semana..." required>
-                </div>
+            <form id="formulario-partida">
+                <div class="cuerpo-modal">
+                    <div class="campo">
+                        <label class="etiqueta-campo" for="campo-concepto">Concepto</label>
+                        <input type="text" id="campo-concepto" name="concepto" placeholder="Alquiler, suscripción, ocio…" required autocomplete="off">
+                    </div>
 
-                <div class="campo-formulario">
-                    <label for="campo-gasto-importe">Importe (€)</label>
-                    <input type="number" id="campo-gasto-importe" name="importe" step="0.01" min="0.01" placeholder="0.00" inputmode="decimal" required>
-                </div>
+                    <div class="rejilla-modal">
+                        <div class="campo">
+                            <label class="etiqueta-campo" for="campo-importe">Importe</label>
+                            <div class="envoltorio-euro">
+                                <input type="text" id="campo-importe" name="importe" class="campo-monetario" placeholder="0,00" inputmode="decimal" enterkeyhint="done" autocomplete="off" required>
+                                <span class="simbolo-euro" aria-hidden="true">€</span>
+                            </div>
+                        </div>
 
-                <div class="campo-formulario">
-                    <label for="campo-gasto-categoria">Categoría</label>
-                    <select id="campo-gasto-categoria" name="categoria">
-                        <option value="VIVIENDA_COMIDA">Comida y Aportación Hogar</option>
-                        <option value="DIGITAL_SUSCRIPCIONES">Suscripciones y Facturas</option>
-                        <option value="DEUDAS_OBLIGACIONES">Deudas y Obligaciones</option>
-                        <option value="OCIO_ESTILO_VIDA" selected>Ocio y Gastos Personales</option>
-                        <option value="PREVISION_RESERVAS">Previsión de Recibos / Fondo</option>
-                        <option value="AHORRO_INVERSION">Ahorro e Inversión</option>
-                    </select>
-                </div>
+                        <div class="campo">
+                            <label class="etiqueta-campo" for="campo-categoria">Categoría</label>
+                            <select id="campo-categoria" name="categoria" class="control"></select>
+                        </div>
+                    </div>
 
-                <div class="campo-formulario">
-                    <label for="campo-gasto-canal">Canal de Pago</label>
-                    <select id="campo-gasto-canal" name="canal">
-                        <option value="Cuenta Bancaria">Cuenta Bancaria (Tarjeta / Domiciliación)</option>
-                        <option value="Efectivo Físico">Efectivo Físico (Retirar en Cajero / Dinero en Mano)</option>
-                    </select>
-                </div>
+                    <div class="campo oculto" id="campo-subtipo-envoltorio">
+                        <label class="etiqueta-campo" for="campo-subtipo">Tipo de patrimonio</label>
+                        <select id="campo-subtipo" name="subtipo" class="control">
+                            <option value="AHORRO">Ahorro líquido (colchón disponible)</option>
+                            <option value="INVERSION">Inversión (fondos, ETFs, bróker)</option>
+                        </select>
+                        <span class="ayuda-campo">Determina en qué columna se acumula en la proyección.</span>
+                    </div>
 
-                <div class="campo-formulario">
-                    <label for="campo-gasto-descripcion">Descripción o notas (Opcional)</label>
-                    <textarea id="campo-gasto-descripcion" name="descripcion" rows="2" placeholder="Detalles de este gasto..."></textarea>
-                </div>
+                    <div class="rejilla-modal">
+                        <div class="campo">
+                            <label class="etiqueta-campo" for="campo-canal">Canal de pago</label>
+                            <select id="campo-canal" name="canal" class="control">
+                                <option value="Cuenta Bancaria">Cuenta bancaria (tarjeta / recibo)</option>
+                                <option value="Efectivo Físico">Efectivo físico (billetes)</option>
+                            </select>
+                        </div>
 
-                <div class="campo-formulario" style="flex-direction: row; align-items: center; gap: 10px;">
-                    <input type="checkbox" id="campo-gasto-recurrente" name="recurrente" checked style="width: auto;">
-                    <label for="campo-gasto-recurrente" style="cursor: pointer;">Partida mensual recurrente (se repite cada mes)</label>
+                        <div class="campo">
+                            <label class="etiqueta-campo" for="campo-duracion">Duración</label>
+                            <select id="campo-duracion" name="duracion" class="control">
+                                <option value="recurrente">Todos los meses</option>
+                                <option value="1">Solo el mes 1</option>
+                                <option value="2">Hasta el mes 2</option>
+                                <option value="3">Hasta el mes 3</option>
+                                <option value="4">Hasta el mes 4</option>
+                                <option value="5">Hasta el mes 5</option>
+                                <option value="6">Hasta el mes 6</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="campo">
+                        <label class="etiqueta-campo" for="campo-descripcion">Notas (opcional)</label>
+                        <textarea id="campo-descripcion" name="descripcion" rows="2" placeholder="Detalles de esta partida…"></textarea>
+                    </div>
+
+                    <label class="fila-casilla" for="campo-esencial">
+                        <input type="checkbox" id="campo-esencial" name="esencial">
+                        <span>
+                            Gasto esencial
+                            <small>Márcalo si es un gasto imprescindible que no puedes recortar.</small>
+                        </span>
+                    </label>
                 </div>
 
                 <div class="pie-modal">
-                    <button type="button" id="boton-cancelar-modal" class="boton-secundario">Cancelar</button>
-                    <button type="submit" class="boton-primario">Guardar Partida</button>
+                    <button type="button" id="boton-cancelar-modal" class="boton boton--secundario">Cancelar</button>
+                    <button type="submit" class="boton boton--primario">Guardar</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- BARRA DE NAVEGACIÓN INFERIOR FIJA PARA MÓVIL (ESTILO APP NATIVA) -->
-    <nav id="barra-navegacion-inferior-movil" class="barra-navegacion-inferior-movil">
-        <button class="item-navegacion-movil activa" data-pestana="panel-gastos" title="Partidas de Presupuesto">
-            <i data-lucide="list-checks"></i>
-            <span>Partidas</span>
-        </button>
-        <button class="item-navegacion-movil" data-pestana="panel-lugares" title="Control Diario por Lugares (Sobres)">
-            <i data-lucide="store"></i>
-            <span>Sobres</span>
-        </button>
-        <button class="item-navegacion-movil" data-pestana="panel-canales" title="Cuenta Bancaria vs Efectivo">
-            <i data-lucide="arrow-left-right"></i>
-            <span>Bicanal</span>
-        </button>
-        <button class="item-navegacion-movil" data-pestana="panel-excel" title="Proyección 6 Meses">
-            <i data-lucide="table-2"></i>
-            <span>Proyección</span>
-        </button>
-        <button class="item-navegacion-movil" data-pestana="panel-inversiones" title="Inversiones y APIs Gratuitas">
-            <i data-lucide="trending-up"></i>
-            <span>Inversión</span>
-        </button>
-    </nav>
+    <!-- ============================= MODAL DE CONFIRMACIÓN ============================= -->
+    <div id="modal-confirmacion" class="fondo-modal" role="dialog" aria-modal="true" aria-labelledby="titulo-confirmacion">
+        <div class="caja-modal">
+            <div class="cabecera-modal">
+                <h2 id="titulo-confirmacion" class="titulo-modal">¿Confirmas la acción?</h2>
+                <button type="button" id="boton-cerrar-confirmacion" class="boton-icono" aria-label="Cerrar">
+                    <i data-lucide="x" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="cuerpo-modal">
+                <p id="texto-confirmacion" class="texto-confirmacion"></p>
+            </div>
+            <div class="pie-modal">
+                <button type="button" id="boton-cancelar-confirmacion" class="boton boton--secundario">Cancelar</button>
+                <button type="button" id="boton-aceptar-confirmacion" class="boton boton--peligro">Sí, continuar</button>
+            </div>
+        </div>
+    </div>
 
-    <!-- BOTÓN FLOTANTE DE ACCIÓN RÁPIDA (FAB) PARA ANOTAR GASTOS EN MÓVIL -->
-    <button id="boton-flotante-agregar-gasto" class="boton-flotante-accion" title="Anotar gasto rápido en comercio">
-        <i data-lucide="plus"></i>
-        <span class="etiqueta-fab-texto">Gasto</span>
-    </button>
+    <!-- ============================= AVISOS EMERGENTES ============================= -->
+    <div id="contenedor-avisos" class="contenedor-avisos" role="status" aria-live="polite"></div>
 
-    <!-- Script de Inicialización ES Module -->
     <script type="module" src="app.js"></script>
 </body>
 </html>

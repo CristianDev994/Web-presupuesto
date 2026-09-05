@@ -5,13 +5,22 @@ export const CANALES_PAGO = {
     FISICO: 'Efectivo Físico'
 };
 
+// Subtipo explícito de las partidas de patrimonio: evita clasificar por texto libre
+export const SUBTIPOS_PATRIMONIO = {
+    AHORRO: 'AHORRO',
+    INVERSION: 'INVERSION'
+};
+
+// "liberaAhorro" indica si el dinero NO gastado de esa categoria puede considerarse
+// ahorro real. Las deudas y las reservas son compromisos ya adquiridos: aunque no
+// se hayan pagado todavia, ese dinero no esta libre y no cuenta como ahorro.
 export const CATEGORIAS_GASTO = {
-    VIVIENDA_COMIDA: { nombre: 'Comida y Aportación Hogar', icono: 'utensils', color: '#10b981' },
-    DIGITAL_SUSCRIPCIONES: { nombre: 'Suscripciones y Facturas', icono: 'laptop', color: '#6366f1' },
-    DEUDAS_OBLIGACIONES: { nombre: 'Deudas y Obligaciones', icono: 'credit-card', color: '#ef4444' },
-    OCIO_ESTILO_VIDA: { nombre: 'Ocio y Gastos Personales', icono: 'sparkles', color: '#f59e0b' },
-    PREVISION_RESERVAS: { nombre: 'Previsión de Recibos / Fondo', icono: 'calendar-check', color: '#8b5cf6' },
-    AHORRO_INVERSION: { nombre: 'Ahorro e Inversión', icono: 'trending-up', color: '#06b6d4' }
+    VIVIENDA_COMIDA: { nombre: 'Comida y Aportación Hogar', nombreCorto: 'Comida y Hogar', icono: 'utensils', color: '#10b981', liberaAhorro: true },
+    DIGITAL_SUSCRIPCIONES: { nombre: 'Suscripciones y Facturas', nombreCorto: 'Suscripciones', icono: 'laptop', color: '#6366f1', liberaAhorro: true },
+    DEUDAS_OBLIGACIONES: { nombre: 'Deudas y Obligaciones', nombreCorto: 'Deudas', icono: 'credit-card', color: '#ef4444', liberaAhorro: false },
+    OCIO_ESTILO_VIDA: { nombre: 'Ocio y Gastos Personales', nombreCorto: 'Ocio', icono: 'sparkles', color: '#f59e0b', liberaAhorro: true },
+    PREVISION_RESERVAS: { nombre: 'Previsión de Recibos / Fondo', nombreCorto: 'Previsión', icono: 'calendar-check', color: '#8b5cf6', liberaAhorro: false },
+    AHORRO_INVERSION: { nombre: 'Ahorro e Inversión', nombreCorto: 'Ahorro', icono: 'trending-up', color: '#06b6d4', liberaAhorro: false }
 };
 
 // Sugerencias de lugares y comercios habituales para autocompletado rápido
@@ -47,9 +56,11 @@ export const APIS_INVERSION_GRATUITAS = [
         nombre: 'Yahoo Finance (Endpoints Públicos)',
         gratuita: true,
         requiereClave: false,
+        limiteGratis: 'Sin clave de API',
         cobertura: 'ETFs globales (MSCI World, S&P 500), fondos indexados, acciones y divisas.',
         descripcion: 'La fuente más utilizada en finanzas personales. Permite consultar cotizaciones históricas, precios en tiempo real y ratios de gastos (TER).',
-        urlDocumentacion: 'https://query1.finance.yahoo.com/v8/finance/chart/'
+        urlDocumentacion: 'https://query1.finance.yahoo.com/v8/finance/chart/VWCE.DE',
+        textoEnlace: 'Ver endpoint de ejemplo (VWCE)'
     },
     {
         nombre: 'Alpha Vantage',
@@ -58,7 +69,8 @@ export const APIS_INVERSION_GRATUITAS = [
         limiteGratis: '25 peticiones / día',
         cobertura: 'Renta variable global, ETFs, divisas (Forex) y criptomonedas.',
         descripcion: 'API muy sólida con datos ajustados por dividendos y splits. Excelente para simulaciones de carteras a largo plazo.',
-        urlDocumentacion: 'https://www.alphavantage.co/'
+        urlDocumentacion: 'https://www.alphavantage.co/documentation/',
+        textoEnlace: 'Documentación Alpha Vantage'
     },
     {
         nombre: 'CoinGecko API',
@@ -67,7 +79,8 @@ export const APIS_INVERSION_GRATUITAS = [
         limiteGratis: '30 peticiones / minuto',
         cobertura: 'Precios en tiempo real, capitalización y evolución de criptoactivos.',
         descripcion: 'Totalmente abierta y gratuita sin necesidad de registrarse ni tarjeta de crédito.',
-        urlDocumentacion: 'https://www.coingecko.com/es/api'
+        urlDocumentacion: 'https://www.coingecko.com/es/api',
+        textoEnlace: 'Documentación CoinGecko'
     },
     {
         nombre: 'Frankfurter API (Banco Central Europeo)',
@@ -76,11 +89,12 @@ export const APIS_INVERSION_GRATUITAS = [
         limiteGratis: 'Ilimitada / Open Source',
         cobertura: 'Tipos de cambio oficiales entre Euro, Dólar y más de 30 divisas mundiales.',
         descripcion: 'Datos del Banco Central Europeo actualizados a diario para conversión exacta de inversiones en divisa extranjera.',
-        urlDocumentacion: 'https://www.frankfurter.app/'
+        urlDocumentacion: 'https://www.frankfurter.app/',
+        textoEnlace: 'Documentación Frankfurter'
     }
 ];
 
-// Perfiles presupuestarios inteligentes
+// Perfiles presupuestarios inteligentes (los porcentajes de cada perfil suman exactamente 100)
 export const PERFILES_PRESUPUESTO = {
     VIVIENDO_PADRES: {
         id: 'VIVIENDO_PADRES',
@@ -91,8 +105,8 @@ export const PERFILES_PRESUPUESTO = {
             { concepto: 'Dinero de bolsillo y gastos diarios', porcentaje: 7, categoria: 'OCIO_ESTILO_VIDA', canal: CANALES_PAGO.FISICO, recurrente: true, descripcion: 'Efectivo en mano para compras cotidianas' },
             { concepto: 'Ocio, salidas de fin de semana y social', porcentaje: 7, categoria: 'OCIO_ESTILO_VIDA', canal: CANALES_PAGO.FISICO, recurrente: true, descripcion: 'Restaurantes, copas o actividades en efectivo' },
             { concepto: 'Suscripciones digitales y telefonía', porcentaje: 3, categoria: 'DIGITAL_SUSCRIPCIONES', canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Herramientas digitales, streaming o móvil en cuenta' },
-            { concepto: 'Ahorro líquido (Fondo de emergencia)', porcentaje: 35, categoria: 'AHORRO_INVERSION', canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Colchón intocable en cuenta bancaria remunerada' },
-            { concepto: 'Inversión a largo plazo (Fondos indexados)', porcentaje: 30, categoria: 'AHORRO_INVERSION', canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Patrimonio bancarizado para rentabilidad compuesta' }
+            { concepto: 'Ahorro líquido (Fondo de emergencia)', porcentaje: 35, categoria: 'AHORRO_INVERSION', subtipo: SUBTIPOS_PATRIMONIO.AHORRO, canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Colchón intocable en cuenta bancaria remunerada' },
+            { concepto: 'Inversión a largo plazo (Fondos indexados)', porcentaje: 30, categoria: 'AHORRO_INVERSION', subtipo: SUBTIPOS_PATRIMONIO.INVERSION, canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Patrimonio bancarizado para rentabilidad compuesta' }
         ]
     },
     INDEPENDIENTE_ALQUILER: {
@@ -105,8 +119,8 @@ export const PERFILES_PRESUPUESTO = {
             { concepto: 'Cesta de la compra y alimentación', porcentaje: 15, categoria: 'VIVIENDA_COMIDA', canal: CANALES_PAGO.FISICO, recurrente: true, descripcion: 'Supermercado y comida fresca (absorción prioritaria en efectivo)' },
             { concepto: 'Ocio, salidas y compras personales', porcentaje: 10, categoria: 'OCIO_ESTILO_VIDA', canal: CANALES_PAGO.FISICO, recurrente: true, descripcion: 'Disfrute personal pagado en efectivo' },
             { concepto: 'Suscripciones y servicios digitales', porcentaje: 4, categoria: 'DIGITAL_SUSCRIPCIONES', canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Servicios en la nube y suscripciones en cuenta' },
-            { concepto: 'Ahorro para imprevistos', porcentaje: 15, categoria: 'AHORRO_INVERSION', canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Reserva para emergencias domésticas' },
-            { concepto: 'Inversión patrimonial', porcentaje: 15, categoria: 'AHORRO_INVERSION', canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Crecimiento de capital a largo plazo' }
+            { concepto: 'Ahorro para imprevistos', porcentaje: 15, categoria: 'AHORRO_INVERSION', subtipo: SUBTIPOS_PATRIMONIO.AHORRO, canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Reserva para emergencias domésticas' },
+            { concepto: 'Inversión patrimonial', porcentaje: 15, categoria: 'AHORRO_INVERSION', subtipo: SUBTIPOS_PATRIMONIO.INVERSION, canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Crecimiento de capital a largo plazo' }
         ]
     },
     REGLA_50_30_20: {
@@ -116,7 +130,7 @@ export const PERFILES_PRESUPUESTO = {
         partidas: [
             { concepto: 'Necesidades básicas y hogar (50%)', porcentaje: 50, categoria: 'VIVIENDA_COMIDA', canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Vivienda, facturas y alimentación indispensable' },
             { concepto: 'Deseos, ocio y estilo de vida (30%)', porcentaje: 30, categoria: 'OCIO_ESTILO_VIDA', canal: CANALES_PAGO.FISICO, recurrente: true, descripcion: 'Caprichos y salidas pagados en efectivo' },
-            { concepto: 'Ahorro e inversión futura (20%)', porcentaje: 20, categoria: 'AHORRO_INVERSION', canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Construcción de colchón financiero e inversión' }
+            { concepto: 'Ahorro e inversión futura (20%)', porcentaje: 20, categoria: 'AHORRO_INVERSION', subtipo: SUBTIPOS_PATRIMONIO.AHORRO, canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Construcción de colchón financiero e inversión' }
         ]
     },
     MAXIMO_AHORRO: {
@@ -126,18 +140,16 @@ export const PERFILES_PRESUPUESTO = {
         partidas: [
             { concepto: 'Gastos esenciales mínimos', porcentaje: 25, categoria: 'VIVIENDA_COMIDA', canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Lo estrictamente necesario para vivir' },
             { concepto: 'Ocio controlado y caprichos', porcentaje: 5, categoria: 'OCIO_ESTILO_VIDA', canal: CANALES_PAGO.FISICO, recurrente: true, descripcion: 'Mínimo indispensable en efectivo' },
-            { concepto: 'Ahorro acelerado de emergencia', porcentaje: 35, categoria: 'AHORRO_INVERSION', canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Fondo blindado de seguridad bancarizado' },
-            { concepto: 'Inversión agresiva a largo plazo', porcentaje: 35, categoria: 'AHORRO_INVERSION', canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Generación de patrimonio compuesto en bróker' }
+            { concepto: 'Ahorro acelerado de emergencia', porcentaje: 35, categoria: 'AHORRO_INVERSION', subtipo: SUBTIPOS_PATRIMONIO.AHORRO, canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Fondo blindado de seguridad bancarizado' },
+            { concepto: 'Inversión agresiva a largo plazo', porcentaje: 35, categoria: 'AHORRO_INVERSION', subtipo: SUBTIPOS_PATRIMONIO.INVERSION, canal: CANALES_PAGO.CUENTA, recurrente: true, descripcion: 'Generación de patrimonio compuesto en bróker' }
         ]
     }
 };
 
-// Caso de ejemplo personal guardado
+// Caso de ejemplo personal guardado (importes en euros; se convierten a céntimos al cargarlos)
 export const CASO_EJEMPLO_INICIAL = {
     ingresoCuenta: 1000.00,
     ingresoFisico: 400.00,
-    ingresoMes1: 1400.00,
-    ingresoMesSiguientes: 1600.00,
     gastosOptimizados: [
         { id: 'ejemplo-1', concepto: 'Aportación comida y hogar (Padres)', importe: 250.00, categoria: 'VIVIENDA_COMIDA', canal: CANALES_PAGO.FISICO, esencial: true, recurrente: true, descripcion: 'Aportación justa viviendo con padres en efectivo' },
         { id: 'ejemplo-2', concepto: 'Tonterías / Dinero de bolsillo', importe: 70.00, categoria: 'OCIO_ESTILO_VIDA', canal: CANALES_PAGO.FISICO, esencial: false, recurrente: true, descripcion: 'Efectivo en mano para compras cotidianas' },
@@ -147,11 +159,13 @@ export const CASO_EJEMPLO_INICIAL = {
         { id: 'ejemplo-6', concepto: 'Botellón y salida de Feria', importe: 38.78, categoria: 'OCIO_ESTILO_VIDA', canal: CANALES_PAGO.FISICO, esencial: false, recurrente: false, descripcion: 'Gasto puntual de ocio en efectivo' },
         { id: 'ejemplo-7', concepto: 'Deuda general pendiente', importe: 140.00, categoria: 'DEUDAS_OBLIGACIONES', canal: CANALES_PAGO.CUENTA, esencial: true, recurrente: false, mesFiniquito: 1, descripcion: 'Liquidada en Mes 1' },
         { id: 'ejemplo-8', concepto: 'Deuda FL Studio', importe: 40.00, categoria: 'DEUDAS_OBLIGACIONES', canal: CANALES_PAGO.CUENTA, esencial: true, recurrente: false, mesFiniquito: 1, descripcion: 'Liquidada en Mes 1' },
-        { id: 'ejemplo-9', concepto: 'Reserva para recibo próximo mes', importe: 50.00, categoria: 'PREVISION_RESERVAS', canal: CANALES_PAGO.CUENTA, esencial: true, recurrente: false, mesFiniquito: 1, descripcion: 'Apartado para Mes 2' }
+        { id: 'ejemplo-9', concepto: 'Reserva para recibo próximo mes', importe: 50.00, categoria: 'PREVISION_RESERVAS', canal: CANALES_PAGO.CUENTA, esencial: true, recurrente: false, mesFiniquito: 1, descripcion: 'Apartado para Mes 2' },
+        { id: 'ejemplo-10', concepto: 'Ahorro líquido de emergencia', importe: 474.22, categoria: 'AHORRO_INVERSION', subtipo: SUBTIPOS_PATRIMONIO.AHORRO, canal: CANALES_PAGO.CUENTA, esencial: true, recurrente: true, descripcion: 'Colchón intocable en cuenta remunerada' },
+        { id: 'ejemplo-11', concepto: 'Inversión en fondo indexado MSCI World', importe: 300.00, categoria: 'AHORRO_INVERSION', subtipo: SUBTIPOS_PATRIMONIO.INVERSION, canal: CANALES_PAGO.CUENTA, esencial: false, recurrente: true, descripcion: 'Aportación periódica automatizada al bróker' }
     ],
     transaccionesEjemplo: [
-        { id: 'trans-ejemplo-1', fecha: '2026-09-02', lugar: 'Mercadona', importe: 42.50, categoria: 'VIVIENDA_COMIDA', canal: CANALES_PAGO.FISICO, notas: 'Compra semanal de comida fresca' },
-        { id: 'trans-ejemplo-2', fecha: '2026-09-03', lugar: 'Bar de Tapas / Cerveza', importe: 18.00, categoria: 'OCIO_ESTILO_VIDA', canal: CANALES_PAGO.FISICO, notas: 'Salida con amigos tarde de viernes' },
-        { id: 'trans-ejemplo-3', fecha: '2026-09-04', lugar: 'Suscripción ChatGPT Plus', importe: 20.00, categoria: 'DIGITAL_SUSCRIPCIONES', canal: CANALES_PAGO.CUENTA, notas: 'Cargo automático en tarjeta virtual' }
+        { id: 'trans-ejemplo-1', fecha: '2026-09-02', mes: 1, lugar: 'Mercadona', importe: 42.50, categoria: 'VIVIENDA_COMIDA', canal: CANALES_PAGO.FISICO, notas: 'Compra semanal de comida fresca' },
+        { id: 'trans-ejemplo-2', fecha: '2026-09-03', mes: 1, lugar: 'Bar de Tapas / Cerveza', importe: 18.00, categoria: 'OCIO_ESTILO_VIDA', canal: CANALES_PAGO.FISICO, notas: 'Salida con amigos tarde de viernes' },
+        { id: 'trans-ejemplo-3', fecha: '2026-09-04', mes: 1, lugar: 'Suscripción ChatGPT Plus', importe: 20.00, categoria: 'DIGITAL_SUSCRIPCIONES', canal: CANALES_PAGO.CUENTA, notas: 'Cargo automático en tarjeta virtual' }
     ]
 };
