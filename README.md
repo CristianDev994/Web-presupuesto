@@ -1,19 +1,23 @@
 # Presupuesto Personal Inteligente 💰
 
-Aplicación web para el control financiero mensual con **separación bicanal** entre cuenta bancaria y efectivo físico. Diseño *mobile first*, cálculos exactos al céntimo, sobres digitales de gasto diario, proyección a 6 meses y exportación a Excel.
+Aplicación web progresiva (PWA) para el control financiero mensual con **separación bicanal** entre cuenta bancaria y efectivo físico. Diseño *mobile first*, cálculos exactos al céntimo, gestión integral de deudas con plan de amortización, sobres digitales de gasto diario, proyección configurable a 6, 12 o 24 meses y exportación profesional a Excel.
 
-No necesita servidor ni base de datos: todo se guarda en tu navegador.
+No necesita servidor ni base de datos: funciona 100 % en local y sin conexión a internet.
 
 ---
 
 ## ✨ Qué hace
 
 - **Reparte tu sueldo al céntimo.** Introduces lo que cobras en banco y en efectivo, eliges tu situación de vida y la app genera las partidas. La suma de todas ellas es *exactamente* tu sueldo neto, sin descuadres de un céntimo.
+- **Gestión integral de deudas y compromisos.** Registra préstamos, tarjetas o créditos con acreedor, saldo y cuota. Permite amortizaciones extraordinarias, calcula la fecha estimada de libertad financiera y sincroniza automáticamente las cuotas con el presupuesto y la proyección.
+- **Duración de la deuda a tu manera.** Defínela por cuota mensual (y la app calcula cuánto durará) o por duración en **días, meses o años** (y la app calcula la cuota). El resultado se ve mientras escribes, incluida la última cuota cuando el reparto no es exacto.
+- **Qué parte de tu sueldo se va en deudas.** Calcula el porcentaje exacto de tus ingresos netos que se destina a cuotas, lo compara con la referencia habitual del 35 %, indica cuánto margen o exceso tienes en euros y en qué mes bajarás del límite si mantienes el plan.
 - **Te dice cuánto sacar del cajero.** Calcula qué gastos conviene pagar en billetes y cuánto dinero bancario queda libre para invertir.
-- **Sobres digitales por categoría.** Anotas cada compra con su lugar (Mercadona, gasolinera, bar…) y ves en tiempo real cuánto te queda en cada sobre.
-- **Proyección a 6 meses.** Evolución mensual de ingresos, deudas liquidadas, ahorro, inversión y patrimonio acumulado.
-- **Exportación real a Excel (.xlsx)** con 5 hojas y los importes como números con formato de moneda, listos para sumar.
-- **Copias de seguridad en JSON** para pasar tus datos entre el móvil y el ordenador.
+- **Sobres digitales por categoría.** Anotas cada compra con su lugar (Mercadona, gasolinera, bar…) y ves en tiempo real cuánto te queda en cada sobre con botón rápido directo.
+- **Proyección patrimonial flexible.** Horizonte temporal configurable a 6, 12 o 24 meses: evolución mensual de ingresos, gastos fijos, deudas liquidadas, ahorro, inversión y patrimonio total acumulado.
+- **PWA instalable y modo sin conexión.** Service Worker y manifiesto integrados para instalar la aplicación en el móvil u ordenador como app nativa independiente.
+- **Exportación real a Excel (.xlsx)** con hasta 6 hojas estructuradas (incluyendo hoja de Deudas y Compromisos) y los importes como números con formato de moneda española listos para sumar.
+- **Copias de seguridad en JSON con salvaguarda.** Snapshot preventivo automático en el navegador antes de sobrescribir datos durante una importación.
 
 ---
 
@@ -40,6 +44,8 @@ Todo el dinero se maneja internamente como un **número entero de céntimos**. N
 - El excedente mensual se divide entre ahorro e inversión sin perder ni duplicar céntimos, incluso con cantidades impares.
 - Los campos de importe aceptan la **coma decimal española** (`1.234,56`) además del punto.
 - Se cumple siempre la identidad contable: `ingreso = consumo + ahorro + inversión + balance`.
+- La carga de deuda también cuadra: `cuotas + resto del sueldo = ingreso neto`.
+- Los importes a amortizar se expresan siempre en céntimos, sin deducir la unidad por su magnitud.
 
 ### Ejecutar las pruebas
 
@@ -85,8 +91,11 @@ La aplicación es 100 % estática, así que puede alojarse gratis:
 | `gestor_financiero.js` | Motor de cálculo en céntimos enteros |
 | `utilidades_dinero.js` | Aritmética monetaria exacta y formateo español |
 | `datos_iniciales.js` | Categorías, perfiles presupuestarios y catálogo de APIs |
-| `exportador_excel.js` | Generación del libro `.xlsx` |
-| `pruebas_calculos.mjs` | Pruebas de exactitud del motor |
+| `exportador_excel.js` | Generación del libro `.xlsx` con soporte para hoja de deudas |
+| `manifest.json` | Manifiesto PWA para instalación en móviles y escritorio |
+| `sw.js` | Service Worker para funcionamiento sin conexión (App Shell) |
+| `icono.svg` | Icono vectorial para PWA y accesos directos |
+| `pruebas_calculos.mjs` | Pruebas de exactitud del motor (47 bloques) |
 | `servidor.js` | Servidor local de desarrollo sin dependencias |
 
 ---

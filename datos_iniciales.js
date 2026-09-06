@@ -23,6 +23,83 @@ export const CATEGORIAS_GASTO = {
     AHORRO_INVERSION: { nombre: 'Ahorro e Inversión', nombreCorto: 'Ahorro', icono: 'trending-up', color: '#06b6d4', liberaAhorro: false }
 };
 
+// Unidades admitidas para indicar cuanto durara una deuda.
+// El presupuesto es mensual, asi que los dias y los anios se convierten a meses
+// completos: la duracion en dias se redondea al alza porque una deuda que dura
+// 40 dias sigue ocupando dos cuotas mensuales.
+export const UNIDADES_PLAZO_DEUDA = {
+    DIAS: {
+        id: 'DIAS',
+        etiqueta: 'días',
+        etiquetaSingular: 'día',
+        // Media del calendario gregoriano: 365,2425 / 12
+        diasPorMes: 30.436875
+    },
+    MESES: {
+        id: 'MESES',
+        etiqueta: 'meses',
+        etiquetaSingular: 'mes'
+    },
+    ANIOS: {
+        id: 'ANIOS',
+        etiqueta: 'años',
+        etiquetaSingular: 'año',
+        mesesPorUnidad: 12
+    }
+};
+
+// Tramos de referencia para la parte del sueldo que se va en pagar deudas.
+// El 35 % es la orientacion que suele usarse en banca para el conjunto de cuotas
+// mensuales sobre los ingresos netos; no es una norma legal, sino una referencia
+// habitual que la aplicacion muestra como orientacion.
+export const REFERENCIA_CARGA_DEUDA = {
+    // Porcentaje del ingreso neto a partir del cual la carga se considera elevada
+    limiteRecomendado: 35,
+    fuente: 'Referencia habitual en banca: las cuotas no deberían superar el 35 % de los ingresos netos.',
+    tramos: [
+        {
+            nivel: 'sin_deuda',
+            hasta: 0,
+            etiqueta: 'Sin deudas',
+            simbolo: '✓',
+            resumen: 'No tienes cuotas de deuda este mes.',
+            consejo: 'Todo tu sueldo queda disponible para gastos, ahorro e inversión.'
+        },
+        {
+            nivel: 'holgado',
+            hasta: 15,
+            etiqueta: 'Margen amplio',
+            simbolo: '✓',
+            resumen: 'Tus deudas ocupan una parte pequeña del sueldo.',
+            consejo: 'Puedes amortizar capital para terminar antes sin apretar el mes.'
+        },
+        {
+            nivel: 'razonable',
+            hasta: 30,
+            etiqueta: 'Bajo control',
+            simbolo: '✓',
+            resumen: 'La carga es asumible, pero ya se nota en el mes.',
+            consejo: 'Evita añadir nuevas cuotas hasta liquidar alguna de las actuales.'
+        },
+        {
+            nivel: 'ajustado',
+            hasta: 35,
+            etiqueta: 'Cerca del límite',
+            simbolo: '!',
+            resumen: 'Estás rozando la referencia del 35 % de tus ingresos.',
+            consejo: 'Prioriza amortizar la deuda con la cuota más alta antes de asumir otra.'
+        },
+        {
+            nivel: 'elevado',
+            hasta: Infinity,
+            etiqueta: 'Por encima de la referencia',
+            simbolo: '↑',
+            resumen: 'Tus cuotas superan el 35 % de lo que ingresas.',
+            consejo: 'Reduce cuota renegociando plazos o amortizando; evita financiar nuevas compras.'
+        }
+    ]
+};
+
 // Sugerencias de lugares y comercios habituales para autocompletado rápido
 export const LUGARES_FRECUENTES_SUGERIDOS = [
     'Mercadona',
@@ -167,5 +244,9 @@ export const CASO_EJEMPLO_INICIAL = {
         { id: 'trans-ejemplo-1', fecha: '2026-09-02', mes: 1, lugar: 'Mercadona', importe: 42.50, categoria: 'VIVIENDA_COMIDA', canal: CANALES_PAGO.FISICO, notas: 'Compra semanal de comida fresca' },
         { id: 'trans-ejemplo-2', fecha: '2026-09-03', mes: 1, lugar: 'Bar de Tapas / Cerveza', importe: 18.00, categoria: 'OCIO_ESTILO_VIDA', canal: CANALES_PAGO.FISICO, notas: 'Salida con amigos tarde de viernes' },
         { id: 'trans-ejemplo-3', fecha: '2026-09-04', mes: 1, lugar: 'Suscripción ChatGPT Plus', importe: 20.00, categoria: 'DIGITAL_SUSCRIPCIONES', canal: CANALES_PAGO.CUENTA, notas: 'Cargo automático en tarjeta virtual' }
+    ],
+    deudasEjemplo: [
+        { id: 'deuda-ejemplo-1', concepto: 'Deuda general pendiente', importeTotal: 140.00, cuotaMensual: 140.00, canal: CANALES_PAGO.CUENTA, notas: 'Liquidada en Mes 1' },
+        { id: 'deuda-ejemplo-2', concepto: 'Deuda FL Studio', importeTotal: 40.00, cuotaMensual: 40.00, canal: CANALES_PAGO.CUENTA, notas: 'Liquidada en Mes 1' }
     ]
 };

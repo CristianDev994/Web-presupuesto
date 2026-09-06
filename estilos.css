@@ -1023,13 +1023,21 @@ details[open] > .resumen-asistente .indicador-resumen {
    -------------------------------------------------------------------------- */
 .rejilla-metricas {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13.5rem), 1fr));
     gap: var(--espacio-3);
 }
 
 /* La métrica principal ocupa el ancho completo en móvil */
 .tarjeta-metrica--destacada {
     grid-column: 1 / -1;
+}
+
+.fila-metrica-destacada {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--espacio-3);
+    flex-wrap: wrap;
 }
 
 .tarjeta-metrica {
@@ -1100,6 +1108,11 @@ details[open] > .resumen-asistente .indicador-resumen {
     overflow-wrap: anywhere;
 }
 
+.valor-metrica--destacado {
+    font-size: clamp(1.75rem, 1.3rem + 2vw, 2.5rem);
+    font-weight: 800;
+}
+
 .valor-metrica--positivo { color: var(--esmeralda-claro); }
 .valor-metrica--negativo { color: var(--rojo-claro); }
 .valor-metrica--neutro { color: var(--texto); }
@@ -1119,18 +1132,14 @@ details[open] > .resumen-asistente .indicador-resumen {
 }
 
 @media (min-width: 640px) {
-    .rejilla-metricas {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
     .tarjeta-metrica--destacada {
-        grid-column: auto;
+        grid-column: 1 / -1;
     }
 }
 
 @media (min-width: 1100px) {
-    .rejilla-metricas {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+    .tarjeta-metrica--destacada {
+        grid-column: span 2;
     }
 }
 
@@ -2636,4 +2645,466 @@ button.etiqueta-canal:hover {
         box-shadow: none;
         background: #ffffff;
     }
+}
+
+/* --------------------------------------------------------------------------
+   30. BLOQUE DE ATENCIÓN PRIORITARIA
+   -------------------------------------------------------------------------- */
+.bloque-atencion {
+    display: flex;
+    flex-direction: column;
+    gap: var(--espacio-2);
+    margin-bottom: var(--espacio-2);
+}
+
+.tarjeta-alerta-atencion {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--espacio-3);
+    padding: var(--espacio-3) var(--espacio-4);
+    border-radius: var(--radio-md);
+    border: 1px solid var(--borde);
+    background: var(--superficie);
+    box-shadow: var(--sombra-sm);
+    animation: entrar-aviso 240ms ease both;
+}
+
+.tarjeta-alerta-atencion--peligro {
+    border-left: 4px solid var(--rojo);
+    background: color-mix(in srgb, var(--rojo) 7%, var(--superficie));
+}
+
+.tarjeta-alerta-atencion--aviso {
+    border-left: 4px solid var(--ambar);
+    background: color-mix(in srgb, var(--ambar) 7%, var(--superficie));
+}
+
+.tarjeta-alerta-atencion--info {
+    border-left: 4px solid var(--cian);
+    background: color-mix(in srgb, var(--cian) 7%, var(--superficie));
+}
+
+.icono-alerta-atencion {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+    border-radius: var(--radio-sm);
+    background: var(--superficie-elevada);
+}
+
+.tarjeta-alerta-atencion--peligro .icono-alerta-atencion { color: var(--rojo-claro); }
+.tarjeta-alerta-atencion--aviso .icono-alerta-atencion { color: var(--ambar-claro); }
+.tarjeta-alerta-atencion--info .icono-alerta-atencion { color: var(--cian-claro); }
+
+.icono-alerta-atencion svg {
+    width: 17px;
+    height: 17px;
+}
+
+.cuerpo-alerta-atencion {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.titulo-alerta-atencion {
+    font-size: var(--texto-sm);
+    font-weight: 700;
+    color: var(--texto);
+}
+
+.mensaje-alerta-atencion {
+    font-size: var(--texto-xs);
+    color: var(--texto-suave);
+    line-height: 1.45;
+}
+
+/* --------------------------------------------------------------------------
+   31. GESTIÓN INTEGRAL DE DEUDAS
+   -------------------------------------------------------------------------- */
+.rejilla-metricas-deuda {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+    gap: var(--espacio-3);
+    margin-bottom: var(--espacio-4);
+}
+
+.tarjeta-kpi-deuda {
+    display: flex;
+    flex-direction: column;
+    gap: var(--espacio-2);
+    padding: var(--espacio-4);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio-md);
+    background: var(--superficie);
+    box-shadow: var(--sombra-sm);
+    position: relative;
+    overflow: hidden;
+}
+
+.tarjeta-kpi-deuda::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: var(--acento-kpi-deuda, var(--rojo));
+}
+
+.tarjeta-kpi-deuda--total { --acento-kpi-deuda: var(--rojo); }
+.tarjeta-kpi-deuda--cuota { --acento-kpi-deuda: var(--ambar); }
+.tarjeta-kpi-deuda--meses { --acento-kpi-deuda: var(--purpura); }
+.tarjeta-kpi-deuda--activas { --acento-kpi-deuda: var(--cian); }
+
+.rejilla-tarjetas-deuda {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+    gap: var(--espacio-4);
+}
+
+.tarjeta-deuda {
+    display: flex;
+    flex-direction: column;
+    gap: var(--espacio-3);
+    padding: var(--espacio-4);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio-md);
+    background: var(--superficie);
+    box-shadow: var(--sombra-sm);
+    transition: border-color var(--transicion), box-shadow var(--transicion), transform var(--transicion);
+}
+
+.tarjeta-deuda:hover {
+    border-color: var(--borde-fuerte);
+    box-shadow: var(--sombra-md);
+    transform: translateY(-2px);
+}
+
+.tarjeta-deuda--liquidada {
+    opacity: 0.78;
+    border-left: 4px solid var(--esmeralda);
+}
+
+.cabecera-tarjeta-deuda {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--espacio-2);
+}
+
+.nombre-deuda {
+    font-family: var(--fuente-titulos);
+    font-size: var(--texto-lg);
+    font-weight: 700;
+    color: var(--texto);
+    margin: 0;
+}
+
+.tipo-deuda {
+    font-size: var(--texto-xs);
+    color: var(--texto-tenue);
+    margin-top: 2px;
+}
+
+.cifras-deuda {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--espacio-2);
+    background: var(--superficie-sutil);
+    padding: var(--espacio-3);
+    border-radius: var(--radio-sm);
+}
+
+.cifra-deuda-bloque {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.etiqueta-cifra-deuda {
+    font-size: var(--texto-xs);
+    color: var(--texto-tenue);
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.valor-cifra-deuda {
+    font-family: var(--fuente-titulos);
+    font-size: var(--texto-lg);
+    font-weight: 800;
+    color: var(--texto);
+}
+
+.barra-progreso-deuda {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pista-progreso-deuda {
+    width: 100%;
+    height: 8px;
+    background: var(--superficie-elevada);
+    border-radius: var(--radio-pastilla);
+    overflow: hidden;
+}
+
+.relleno-barra-progreso {
+    height: 100%;
+    background: linear-gradient(90deg, var(--esmeralda), var(--cian-claro));
+    border-radius: var(--radio-pastilla);
+    transition: width 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.detalle-progreso-deuda {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: var(--texto-xs);
+    color: var(--texto-tenue);
+}
+
+.acciones-tarjeta-deuda {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--espacio-2);
+    margin-top: auto;
+    padding-top: var(--espacio-2);
+    border-top: 1px solid var(--borde);
+}
+
+/* --------------------------------------------------------------------------
+   32. RESÚMENES ACCESIBLES DE GRÁFICOS (WCAG 2.2 AA)
+   -------------------------------------------------------------------------- */
+.resumen-grafico-accesible {
+    margin-top: var(--espacio-3);
+    padding: var(--espacio-3);
+    border-radius: var(--radio-sm);
+    background: var(--superficie-sutil);
+    border-left: 3px solid var(--cian-claro);
+    font-size: var(--texto-xs);
+    color: var(--texto-suave);
+    line-height: 1.5;
+}
+
+/* --------------------------------------------------------------------------
+   33. ACCESIBILIDAD GLOBAL Y PREFERENCIAS DE USUARIO
+   -------------------------------------------------------------------------- */
+:focus-visible {
+    outline: 2px solid var(--cian-claro) !important;
+    outline-offset: 2px !important;
+}
+
+html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 80px;
+    scroll-padding-bottom: calc(var(--alto-nav-inferior) + env(safe-area-inset-bottom, 0px) + 32px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* --------------------------------------------------------------------------
+   CARGA DE DEUDA: QUÉ PARTE DEL SUELDO SE VA EN CUOTAS
+   El color nunca es el único canal: el estado se indica también con texto
+   y con un símbolo, siguiendo el criterio de accesibilidad del informe.
+   -------------------------------------------------------------------------- */
+.bloque-carga-deuda {
+    display: flex;
+    flex-direction: column;
+    gap: var(--espacio-4);
+    border-left: 3px solid var(--acento-carga, var(--esmeralda));
+}
+
+.bloque-carga-deuda--holgado { --acento-carga: var(--esmeralda); }
+.bloque-carga-deuda--razonable { --acento-carga: var(--cian); }
+.bloque-carga-deuda--ajustado { --acento-carga: var(--ambar); }
+.bloque-carga-deuda--elevado { --acento-carga: var(--rojo); }
+.bloque-carga-deuda--sin_deuda { --acento-carga: var(--esmeralda); }
+
+.cabecera-carga-deuda {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--espacio-2);
+}
+
+.cifra-carga-deuda {
+    display: flex;
+    flex-direction: column;
+    gap: var(--espacio-1);
+}
+
+.valor-carga-deuda {
+    font-family: var(--fuente-titulos);
+    font-size: clamp(2.25rem, 1.6rem + 3vw, 3.25rem);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--acento-carga, var(--esmeralda));
+    font-variant-numeric: tabular-nums;
+}
+
+.frase-carga-deuda {
+    font-size: var(--texto-base);
+    color: var(--texto-suave);
+    max-width: 62ch;
+}
+
+.frase-carga-deuda strong {
+    color: var(--texto);
+}
+
+/* Medidor con la marca de la referencia recomendada */
+.medidor-carga-deuda {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pista-carga-deuda {
+    position: relative;
+    height: 14px;
+    border-radius: var(--radio-pastilla);
+    background: var(--superficie-sutil);
+    border: 1px solid var(--borde);
+    overflow: hidden;
+}
+
+.relleno-carga-deuda {
+    height: 100%;
+    border-radius: var(--radio-pastilla);
+    background: var(--acento-carga, var(--esmeralda));
+    transition: width var(--transicion);
+}
+
+.marca-referencia-deuda {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 2px;
+    background: var(--texto);
+    opacity: 0.75;
+}
+
+.leyenda-carga-deuda {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--espacio-2);
+    font-size: var(--texto-xs);
+    color: var(--texto-tenue);
+}
+
+.leyenda-carga-deuda span:nth-child(2) {
+    font-weight: 700;
+    color: var(--texto-suave);
+}
+
+/* Detalle numérico: una columna en móvil, tres cuando hay sitio */
+.detalle-carga-deuda {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--espacio-2);
+}
+
+.detalle-carga-deuda > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--espacio-3);
+    padding: var(--espacio-3);
+    border: 1px solid var(--borde);
+    border-radius: var(--radio-md);
+    background: var(--superficie-sutil);
+}
+
+.detalle-carga-deuda dt {
+    font-size: var(--texto-xs);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--texto-tenue);
+}
+
+.detalle-carga-deuda dd {
+    font-family: var(--fuente-titulos);
+    font-size: var(--texto-lg);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.consejo-carga-deuda {
+    font-size: var(--texto-sm);
+    line-height: 1.6;
+    color: var(--texto-suave);
+    padding: var(--espacio-3);
+    border: 1px dashed var(--borde-fuerte);
+    border-radius: var(--radio-md);
+}
+
+.consejo-carga-deuda:empty {
+    display: none;
+}
+
+@media (min-width: 640px) {
+    .detalle-carga-deuda {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .detalle-carga-deuda > div {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+}
+
+@media (min-width: 900px) {
+    .cifra-carga-deuda {
+        flex-direction: row;
+        align-items: baseline;
+        gap: var(--espacio-4);
+    }
+}
+
+/* Fila de duración de la deuda: cantidad + unidad (días / meses / años) */
+.fila-plazo-deuda {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: var(--espacio-2);
+    align-items: stretch;
+}
+
+.fila-plazo-deuda input {
+    min-width: 0;
+    font-family: var(--fuente-titulos);
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+.fila-plazo-deuda select {
+    width: auto;
+    min-width: 7.5rem;
+}
+
+/* Aclaración secundaria dentro de una cifra de la tarjeta de deuda */
+.detalle-cifra-deuda {
+    display: block;
+    margin-top: 2px;
+    font-family: var(--fuente-cuerpo);
+    font-size: var(--texto-xs);
+    font-weight: 500;
+    color: var(--texto-tenue);
 }
