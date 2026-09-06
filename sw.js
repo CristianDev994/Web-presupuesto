@@ -5,7 +5,7 @@
 // navegador reinstala el Service Worker, precarga los recursos nuevos y borra
 // las cachés anteriores; si no cambia, los visitantes que ya entraron seguirían
 // viendo indefinidamente la versión vieja guardada en su navegador.
-const VERSION_CACHE = 'v4';
+const VERSION_CACHE = 'v5';
 const NOMBRE_CACHE = `presupuesto-cache-${VERSION_CACHE}`;
 
 const RECURSOS_LOCALES = [
@@ -66,8 +66,13 @@ self.addEventListener('fetch', eventoPeticion => {
     const url = new URL(solicitud.url);
     if (url.origin !== self.location.origin) return;
 
+    // "no-cache" obliga a revalidar con el servidor (envía If-None-Match) en vez
+    // de reutilizar la copia del navegador. GitHub Pages sirve los archivos con
+    // Cache-Control: max-age=600, así que sin esto una mejora recién publicada
+    // podía tardar hasta diez minutos en verse. La revalidación es barata: si
+    // nada cambió, el servidor responde 304 sin reenviar el archivo.
     eventoPeticion.respondWith(
-        fetch(solicitud)
+        fetch(solicitud, { cache: 'no-cache' })
             .then(respuestaRed => {
                 if (respuestaRed && respuestaRed.status === 200 && respuestaRed.type === 'basic') {
                     const clonRespuesta = respuestaRed.clone();
