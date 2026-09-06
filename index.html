@@ -3,37 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Presupuesto Personal Inteligente | Calculadora Bicanal Banco y Efectivo</title>
-    <meta name="description" content="Calculadora de presupuesto personal bicanal (cuenta bancaria y efectivo), control diario de gastos por lugar, sobres digitales, proyección a 6 meses y exportación a Excel. Cálculos exactos al céntimo y 100% privados en tu navegador.">
+    <title>Presupuesto Claro | Gastos, deudas y ahorro en un solo lugar</title>
+    <meta name="description" content="Planifica tus ingresos, registra gastos reales, contabiliza deudas y entiende cuánto dinero te queda. Los datos se guardan localmente en tu navegador.">
+    <meta name="referrer" content="no-referrer">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.sheetjs.com; style-src 'self' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; manifest-src 'self'; worker-src 'self'">
     <meta name="color-scheme" content="dark light">
     <meta name="theme-color" content="#070a12" media="(prefers-color-scheme: dark)">
     <meta name="theme-color" content="#eef2f8" media="(prefers-color-scheme: light)">
 
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="manifest" href="manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="stylesheet" href="estilos.css">
+    <script src="tema_inicial.js"></script>
 
-    <!-- Tema aplicado antes del primer pintado para evitar el parpadeo de color -->
-    <script>
-        (function aplicarTemaInicial() {
-            try {
-                var guardado = localStorage.getItem('presupuesto_tema');
-                var prefiereClaro = window.matchMedia('(prefers-color-scheme: light)').matches;
-                var tema = guardado || (prefiereClaro ? 'claro' : 'oscuro');
-                document.documentElement.setAttribute('data-tema', tema);
-            } catch (error) {
-                document.documentElement.setAttribute('data-tema', 'oscuro');
-            }
-        })();
-    </script>
-
-    <!-- Librerías externas con versión fijada (compatibles con GitHub Pages) -->
-    <script defer src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Iconos de interfaz. Gráficos y Excel se cargan solo cuando se solicitan. -->
     <script defer src="https://cdn.jsdelivr.net/npm/lucide@0.454.0/dist/umd/lucide.min.js"></script>
 </head>
 <body>
+    <a class="enlace-saltar" href="#contenido-principal">Saltar al contenido principal</a>
     <div class="marco-app">
 
         <!-- ============================= CABECERA ============================= -->
@@ -43,9 +33,9 @@
                     <i data-lucide="wallet-cards"></i>
                 </div>
                 <div class="bloque-titulo">
-                    <h1 class="titulo-app">Presupuesto Inteligente</h1>
+                    <h1 class="titulo-app">Presupuesto Claro</h1>
                     <p class="subtitulo-app">
-                        <span class="texto-largo">Control bicanal y gastos por lugar</span>
+                        <span class="texto-largo">Presupuesto, gastos y deudas</span>
                         <span class="texto-largo" aria-hidden="true">•</span>
                         <span id="insignia-estado" class="insignia">Sin configurar</span>
                     </p>
@@ -88,14 +78,14 @@
 
         <input type="file" id="input-archivo-copia" accept="application/json,.json" class="oculto">
 
-        <main class="contenido-principal">
+        <main id="contenido-principal" class="contenido-principal" tabindex="-1">
 
             <!-- ================== ASISTENTE DE INGRESOS ================== -->
             <details id="bloque-asistente" class="tarjeta" open>
                 <summary class="resumen-asistente">
                     <span class="titulo-bloque">
                         <i data-lucide="calculator" aria-hidden="true"></i>
-                        Configura tus ingresos netos
+                        Configura tu mes e ingresos
                     </span>
                     <span class="indicador-resumen" aria-hidden="true">
                         <i data-lucide="chevron-down"></i>
@@ -104,17 +94,26 @@
 
                 <div class="cuerpo-asistente">
                     <p class="descripcion-bloque">
-                        Indica cuánto dinero limpio recibes en tu cuenta bancaria y cuánto en efectivo físico.
-                        El sistema reparte tu sueldo al céntimo exacto y calcula qué pagar con tarjeta y qué en billetes.
+                        Elige el mes desde el que quieres empezar e indica tus ingresos netos. Después podrás ajustar
+                        cada límite, añadir deudas e importar movimientos reales de tu banco.
                     </p>
 
                     <form id="formulario-ingresos" novalidate>
+                        <div class="campo campo-periodo">
+                            <label class="etiqueta-campo" for="input-periodo-base">
+                                <i data-lucide="calendar-days" aria-hidden="true"></i>
+                                Mes de inicio del presupuesto
+                            </label>
+                            <input type="month" id="input-periodo-base" class="control" autocomplete="off" aria-describedby="ayuda-periodo-base">
+                            <span class="ayuda-campo" id="ayuda-periodo-base">Da un nombre real a cada mes de la proyección y a los movimientos importados.</span>
+                        </div>
+
                         <div class="rejilla-canales">
                             <div class="bloque-canal bloque-canal--cuenta">
                                 <div class="campo">
                                     <label class="etiqueta-campo" for="input-ingreso-cuenta">
                                         <i data-lucide="landmark" aria-hidden="true"></i>
-                                        Dinero en cuenta bancaria
+                                        Ingresos en cuenta bancaria
                                     </label>
                                     <div class="envoltorio-euro">
                                         <input type="text" id="input-ingreso-cuenta" class="campo-monetario" placeholder="1000" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-describedby="ayuda-ingreso-cuenta">
@@ -128,7 +127,7 @@
                                 <div class="campo">
                                     <label class="etiqueta-campo" for="input-ingreso-fisico">
                                         <i data-lucide="banknote" aria-hidden="true"></i>
-                                        Dinero en efectivo / mano
+                                        Ingresos en efectivo
                                     </label>
                                     <div class="envoltorio-euro">
                                         <input type="text" id="input-ingreso-fisico" class="campo-monetario" placeholder="400" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-describedby="ayuda-ingreso-fisico">
@@ -140,7 +139,7 @@
                         </div>
 
                         <p class="resumen-vivo">
-                            <span>Sueldo neto total: <strong id="texto-total-vivo">0,00 €</strong></span>
+                            <span>Ingresos netos totales: <strong id="texto-total-vivo" aria-live="polite">0,00 €</strong></span>
                             <span id="texto-reparto-vivo">0 % en banco • 0 % en efectivo</span>
                         </p>
 
@@ -148,7 +147,7 @@
                             <div class="campo">
                                 <label class="etiqueta-campo" for="selector-perfil">
                                     <i data-lucide="compass" aria-hidden="true"></i>
-                                    Situación de vida
+                                Plantilla inicial
                                 </label>
                                 <select id="selector-perfil" class="control">
                                     <option value="VIVIENDO_PADRES">🏠 Viviendo con mis padres (aportación al hogar)</option>
@@ -160,7 +159,7 @@
 
                             <button type="submit" class="boton boton--primario boton--ancho">
                                 <i data-lucide="sparkles" aria-hidden="true"></i>
-                                Calcular mi presupuesto
+                                Crear mi presupuesto
                             </button>
                         </div>
                     </form>
@@ -179,9 +178,29 @@
 
             <!-- ================== MÉTRICAS PRINCIPALES ================== -->
             <section class="rejilla-metricas" aria-label="Resumen del mes">
-                <article class="tarjeta-metrica tarjeta-metrica--ingreso tarjeta-metrica--destacada">
+                <article class="tarjeta-metrica tarjeta-metrica--destacada">
                     <div class="cabecera-metrica">
-                        <span class="etiqueta-metrica">Ingreso neto total</span>
+                        <span class="etiqueta-metrica">Disponible en tus límites</span>
+                        <span class="icono-metrica" aria-hidden="true"><i data-lucide="wallet"></i></span>
+                    </div>
+                    <div class="fila-metrica-destacada">
+                        <div>
+                            <p id="metrica-disponible" class="valor-metrica valor-metrica--destacado">0,00 €</p>
+                            <p class="subtitulo-metrica">
+                                <i data-lucide="check-circle" aria-hidden="true"></i>
+                                <span id="detalle-disponible">Añade gastos reales para ver cuánto queda</span>
+                            </p>
+                        </div>
+                        <button type="button" id="boton-rapido-gasto" class="boton boton--primario boton--compacto" title="Anotar un gasto rápidamente">
+                            <i data-lucide="plus" aria-hidden="true"></i>
+                            <span>Añadir gasto</span>
+                        </button>
+                    </div>
+                </article>
+
+                <article class="tarjeta-metrica tarjeta-metrica--ingreso">
+                    <div class="cabecera-metrica">
+                        <span class="etiqueta-metrica">Ingresos del mes</span>
                         <span class="icono-metrica" aria-hidden="true"><i data-lucide="coins"></i></span>
                     </div>
                     <p id="metrica-ingreso" class="valor-metrica valor-metrica--neutro">0,00 €</p>
@@ -193,7 +212,7 @@
 
                 <article class="tarjeta-metrica tarjeta-metrica--cuenta">
                     <div class="cabecera-metrica">
-                        <span class="etiqueta-metrica">Gasto en banco</span>
+                        <span class="etiqueta-metrica">Planificado en banco</span>
                         <span class="icono-metrica" aria-hidden="true"><i data-lucide="landmark"></i></span>
                     </div>
                     <p id="metrica-cuenta" class="valor-metrica valor-metrica--neutro">0,00 €</p>
@@ -205,7 +224,7 @@
 
                 <article class="tarjeta-metrica tarjeta-metrica--fisico">
                     <div class="cabecera-metrica">
-                        <span class="etiqueta-metrica">Gasto en efectivo</span>
+                        <span class="etiqueta-metrica">Planificado en efectivo</span>
                         <span class="icono-metrica" aria-hidden="true"><i data-lucide="banknote"></i></span>
                     </div>
                     <p id="metrica-fisico" class="valor-metrica valor-metrica--neutro">0,00 €</p>
@@ -229,7 +248,7 @@
 
                 <article class="tarjeta-metrica tarjeta-metrica--balance">
                     <div class="cabecera-metrica">
-                        <span class="etiqueta-metrica">Balance / cuadre</span>
+                        <span class="etiqueta-metrica">Libre por asignar</span>
                         <span class="icono-metrica" aria-hidden="true"><i data-lucide="scale"></i></span>
                     </div>
                     <p id="metrica-balance" class="valor-metrica valor-metrica--neutro">0,00 €</p>
@@ -238,6 +257,17 @@
                         <span id="detalle-balance">Cuentas cuadradas al céntimo</span>
                     </p>
                 </article>
+            </section>
+
+            <!-- ================== BLOQUE DE ATENCIÓN PRIORITARIA ================== -->
+            <section id="bloque-atencion" class="bloque-atencion oculto" aria-label="Avisos que requieren atención">
+                <div class="cabecera-bloque-atencion">
+                    <h2 class="titulo-bloque-atencion">
+                        <i data-lucide="alert-circle" aria-hidden="true"></i>
+                        Necesita tu atención
+                    </h2>
+                </div>
+                <div id="lista-atencion" class="lista-atencion"></div>
             </section>
 
             <!-- ================== AVISO DIDÁCTICO ================== -->
@@ -258,34 +288,38 @@
 
             <!-- ================== PESTAÑAS (ESCRITORIO) ================== -->
             <nav class="navegacion-pestanas" role="tablist" aria-label="Secciones de la aplicación">
-                <button type="button" class="boton-pestana" role="tab" aria-selected="true" aria-controls="panel-gastos" data-pestana="panel-gastos">
+                <button type="button" id="tab-presupuesto" class="boton-pestana" role="tab" aria-selected="true" aria-controls="panel-gastos" tabindex="0" data-pestana="panel-gastos">
                     <i data-lucide="list-checks" aria-hidden="true"></i>
-                    Partidas del presupuesto
+                    Presupuesto
                 </button>
-                <button type="button" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-lugares" data-pestana="panel-lugares">
+                <button type="button" id="tab-deudas" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-deudas" tabindex="-1" data-pestana="panel-deudas">
+                    <i data-lucide="credit-card" aria-hidden="true"></i>
+                    Deudas
+                </button>
+                <button type="button" id="tab-movimientos" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-lugares" tabindex="-1" data-pestana="panel-lugares">
                     <i data-lucide="store" aria-hidden="true"></i>
-                    Sobres y gastos diarios
+                    Movimientos
                 </button>
-                <button type="button" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-canales" data-pestana="panel-canales">
+                <button type="button" id="tab-canales" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-canales" tabindex="-1" data-pestana="panel-canales">
                     <i data-lucide="arrow-left-right" aria-hidden="true"></i>
-                    Banco vs. efectivo
+                    Banco y efectivo
                 </button>
-                <button type="button" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-excel" data-pestana="panel-excel">
+                <button type="button" id="tab-futuro" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-excel" tabindex="-1" data-pestana="panel-excel">
                     <i data-lucide="table-2" aria-hidden="true"></i>
-                    Proyección 6 meses
+                    Futuro
                 </button>
-                <button type="button" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-graficos" data-pestana="panel-graficos">
+                <button type="button" id="tab-analisis" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-graficos" tabindex="-1" data-pestana="panel-graficos">
                     <i data-lucide="bar-chart-3" aria-hidden="true"></i>
-                    Gráficos
+                    Análisis
                 </button>
-                <button type="button" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-inversiones" data-pestana="panel-inversiones">
+                <button type="button" id="tab-recursos" class="boton-pestana" role="tab" aria-selected="false" aria-controls="panel-inversiones" tabindex="-1" data-pestana="panel-inversiones">
                     <i data-lucide="trending-up" aria-hidden="true"></i>
-                    Inversión y APIs
+                    Recursos
                 </button>
             </nav>
 
             <!-- ================== PANEL 1: PARTIDAS ================== -->
-            <section id="panel-gastos" class="panel-contenido activo" role="tabpanel" tabindex="-1" aria-label="Partidas del presupuesto">
+            <section id="panel-gastos" class="panel-contenido activo" role="tabpanel" tabindex="-1" aria-labelledby="tab-presupuesto">
                 <div class="barra-herramientas">
                     <div class="grupo-filtros">
                         <div class="campo">
@@ -311,7 +345,7 @@
 
                     <button type="button" id="boton-nueva-partida" class="boton boton--primario">
                         <i data-lucide="plus-circle" aria-hidden="true"></i>
-                        Añadir partida
+                        Añadir límite
                     </button>
                 </div>
 
@@ -332,8 +366,110 @@
                 </div>
             </section>
 
+            <!-- ================== PANEL DEUDAS Y COMPROMISOS ================== -->
+            <section id="panel-deudas" class="panel-contenido" role="tabpanel" tabindex="-1" aria-labelledby="tab-deudas">
+                <div class="cabecera-bloque-deudas">
+                    <div>
+                        <h2 class="titulo-bloque">
+                            <i data-lucide="credit-card" aria-hidden="true"></i>
+                            Tus deudas y obligaciones
+                        </h2>
+                        <p class="subtitulo-bloque-deudas">
+                            Controla tus préstamos, compras aplazadas y tarjetas. Las cuotas mensuales se descuentan de tu presupuesto y puedes amortizar capital para acortar plazos.
+                        </p>
+                    </div>
+                    <button type="button" id="boton-nueva-deuda" class="boton boton--primario">
+                        <i data-lucide="plus-circle" aria-hidden="true"></i>
+                        Añadir deuda
+                    </button>
+                </div>
+
+                <!-- Rejilla de métricas de deuda -->
+                <div class="rejilla-metricas-deuda">
+                    <div class="tarjeta-kpi-deuda">
+                        <span class="etiqueta-kpi-deuda">Deuda total pendiente</span>
+                        <p id="kpi-deuda-total" class="valor-kpi-deuda valor-kpi-deuda--alerta">0,00 €</p>
+                        <span class="subtitulo-kpi-deuda" id="kpi-deuda-cuentas">0 deudas activas</span>
+                    </div>
+                    <div class="tarjeta-kpi-deuda">
+                        <span class="etiqueta-kpi-deuda">Cuota mensual comprometida</span>
+                        <p id="kpi-deuda-cuota" class="valor-kpi-deuda">0,00 €</p>
+                        <span class="subtitulo-kpi-deuda" id="kpi-deuda-porcentaje">Descontada de tu presupuesto</span>
+                    </div>
+                    <div class="tarjeta-kpi-deuda">
+                        <span class="etiqueta-kpi-deuda">Tiempo para liquidar</span>
+                        <p id="kpi-deuda-tiempo" class="valor-kpi-deuda">0 meses</p>
+                        <span class="subtitulo-kpi-deuda" id="kpi-deuda-fecha-fin">Sin deudas</span>
+                    </div>
+                    <div class="tarjeta-kpi-deuda">
+                        <span class="etiqueta-kpi-deuda">Total amortizado</span>
+                        <p id="kpi-deuda-amortizado" class="valor-kpi-deuda valor-kpi-deuda--exito">0,00 €</p>
+                        <span class="subtitulo-kpi-deuda">Capital ya devuelto</span>
+                    </div>
+                </div>
+
+                <!-- Parte del sueldo que se destina a pagar deudas -->
+                <section id="bloque-carga-deuda" class="tarjeta bloque-carga-deuda oculto" aria-labelledby="titulo-carga-deuda">
+                    <div class="cabecera-carga-deuda">
+                        <h3 class="titulo-bloque" id="titulo-carga-deuda">
+                            <i data-lucide="gauge" aria-hidden="true"></i>
+                            Qué parte de tu sueldo se va en deudas
+                        </h3>
+                        <span id="estado-carga-deuda" class="insignia">Sin deudas</span>
+                    </div>
+
+                    <div class="cifra-carga-deuda">
+                        <p id="porcentaje-carga-deuda" class="valor-carga-deuda">0 %</p>
+                        <p id="frase-carga-deuda" class="frase-carga-deuda">
+                            No tienes cuotas de deuda este mes.
+                        </p>
+                    </div>
+
+                    <div class="medidor-carga-deuda">
+                        <div class="pista-carga-deuda">
+                            <div id="relleno-carga-deuda"
+                                 class="relleno-carga-deuda"
+                                 role="progressbar"
+                                 aria-valuemin="0"
+                                 aria-valuemax="100"
+                                 aria-valuenow="0"
+                                 aria-labelledby="titulo-carga-deuda"
+                                 data-ancho="0"></div>
+                            <span id="marca-referencia-deuda" class="marca-referencia-deuda" aria-hidden="true"></span>
+                        </div>
+                        <div class="leyenda-carga-deuda">
+                            <span>0 %</span>
+                            <span id="texto-referencia-deuda">Referencia: 35 %</span>
+                            <span>100 %</span>
+                        </div>
+                    </div>
+
+                    <dl class="detalle-carga-deuda">
+                        <div>
+                            <dt>Se va en cuotas</dt>
+                            <dd id="carga-deuda-cuotas">0,00 €</dd>
+                        </div>
+                        <div>
+                            <dt>Te queda del sueldo</dt>
+                            <dd id="carga-deuda-libre">0,00 €</dd>
+                        </div>
+                        <div>
+                            <dt id="carga-deuda-margen-etiqueta">Margen hasta la referencia</dt>
+                            <dd id="carga-deuda-margen">0,00 €</dd>
+                        </div>
+                    </dl>
+
+                    <p id="consejo-carga-deuda" class="consejo-carga-deuda"></p>
+                </section>
+
+                <!-- Rejilla de tarjetas de deuda -->
+                <div id="contenedor-lista-deudas" class="contenedor-lista-deudas">
+                    <div id="rejilla-tarjetas-deuda" class="rejilla-tarjetas-deuda"></div>
+                </div>
+            </section>
+
             <!-- ================== PANEL 2: SOBRES Y GASTOS DIARIOS ================== -->
-            <section id="panel-lugares" class="panel-contenido" role="tabpanel" tabindex="-1" aria-label="Sobres digitales y gastos diarios">
+            <section id="panel-lugares" class="panel-contenido" role="tabpanel" tabindex="-1" aria-labelledby="tab-movimientos">
                 <div class="tarjeta-hucha">
                     <div class="contenido-hucha">
                         <h3>
@@ -442,7 +578,7 @@
             </section>
 
             <!-- ================== PANEL 3: BANCO VS EFECTIVO ================== -->
-            <section id="panel-canales" class="panel-contenido" role="tabpanel" tabindex="-1" aria-label="Comparativa entre cuenta bancaria y efectivo">
+            <section id="panel-canales" class="panel-contenido" role="tabpanel" tabindex="-1" aria-labelledby="tab-canales">
                 <div id="tarjeta-estrategia" class="tarjeta tarjeta-estrategia oculto">
                     <div class="cabecera-bloque">
                         <h2 class="titulo-bloque">
@@ -514,16 +650,29 @@
             </section>
 
             <!-- ================== PANEL 4: PROYECCIÓN ================== -->
-            <section id="panel-excel" class="panel-contenido" role="tabpanel" tabindex="-1" aria-label="Proyección financiera a seis meses">
-                <div class="cabecera-bloque">
-                    <h2 class="titulo-bloque">
-                        <i data-lucide="sheet" aria-hidden="true"></i>
-                        Proyección a 6 meses
-                    </h2>
-                    <button type="button" id="boton-excel-proyeccion" class="boton boton--excel">
-                        <i data-lucide="file-spreadsheet" aria-hidden="true"></i>
-                        Exportar a Excel
-                    </button>
+            <section id="panel-excel" class="panel-contenido" role="tabpanel" tabindex="-1" aria-labelledby="tab-futuro">
+                <div class="cabecera-bloque cabecera-bloque--proyeccion">
+                    <div>
+                        <h2 class="titulo-bloque">
+                            <i data-lucide="sheet" aria-hidden="true"></i>
+                            <span id="titulo-proyeccion-meses">Proyección financiera</span>
+                        </h2>
+                        <span id="subtitulo-horizonte" class="subtitulo-panel">Evolución mensual con amortización de deudas y acumulación patrimonial</span>
+                    </div>
+                    <div class="acciones-proyeccion">
+                        <div class="campo-horizonte">
+                            <label class="etiqueta-campo" for="selector-horizonte">Horizonte:</label>
+                            <select id="selector-horizonte" class="control control--compacto">
+                                <option value="6">6 meses</option>
+                                <option value="12">12 meses (1 año)</option>
+                                <option value="24">24 meses (2 años)</option>
+                            </select>
+                        </div>
+                        <button type="button" id="boton-excel-proyeccion" class="boton boton--excel">
+                            <i data-lucide="file-spreadsheet" aria-hidden="true"></i>
+                            Descargar Excel
+                        </button>
+                    </div>
                 </div>
 
                 <div class="envoltorio-tabla">
@@ -550,42 +699,51 @@
             </section>
 
             <!-- ================== PANEL 5: GRÁFICOS ================== -->
-            <section id="panel-graficos" class="panel-contenido" role="tabpanel" tabindex="-1" aria-label="Gráficos y visualización">
+            <section id="panel-graficos" class="panel-contenido" role="tabpanel" tabindex="-1" aria-labelledby="tab-analisis">
                 <div class="rejilla-graficos">
                     <div class="tarjeta-grafico">
-                        <h2 class="titulo-grafico">
-                            <i data-lucide="pie-chart" aria-hidden="true"></i>
-                            Gastos por categoría
-                        </h2>
+                        <div class="cabecera-grafico">
+                            <h2 class="titulo-grafico">
+                                <i data-lucide="pie-chart" aria-hidden="true"></i>
+                                Gastos por categoría
+                            </h2>
+                        </div>
                         <div class="contenedor-lienzo">
                             <canvas id="grafico-categorias" aria-label="Reparto de gastos por categoría" role="img"></canvas>
                         </div>
+                        <p id="resumen-grafico-categorias" class="resumen-grafico-accesible" aria-live="polite"></p>
                     </div>
 
                     <div class="tarjeta-grafico">
-                        <h2 class="titulo-grafico">
-                            <i data-lucide="scale" aria-hidden="true"></i>
-                            Banco vs. efectivo
-                        </h2>
+                        <div class="cabecera-grafico">
+                            <h2 class="titulo-grafico">
+                                <i data-lucide="scale" aria-hidden="true"></i>
+                                Banco vs. efectivo
+                            </h2>
+                        </div>
                         <div class="contenedor-lienzo">
                             <canvas id="grafico-canales" aria-label="Comparativa de gasto por canal de pago" role="img"></canvas>
                         </div>
+                        <p id="resumen-grafico-canales" class="resumen-grafico-accesible" aria-live="polite"></p>
                     </div>
 
                     <div class="tarjeta-grafico tarjeta-grafico--ancha">
-                        <h2 class="titulo-grafico">
-                            <i data-lucide="trending-up" aria-hidden="true"></i>
-                            Patrimonio acumulado a 6 meses
-                        </h2>
+                        <div class="cabecera-grafico">
+                            <h2 class="titulo-grafico">
+                                <i data-lucide="trending-up" aria-hidden="true"></i>
+                                <span id="titulo-grafico-patrimonio">Patrimonio proyectado acumulado</span>
+                            </h2>
+                        </div>
                         <div class="contenedor-lienzo contenedor-lienzo--alto">
                             <canvas id="grafico-patrimonio" aria-label="Evolución del patrimonio acumulado" role="img"></canvas>
                         </div>
+                        <p id="resumen-grafico-patrimonio" class="resumen-grafico-accesible" aria-live="polite"></p>
                     </div>
                 </div>
             </section>
 
             <!-- ================== PANEL 6: INVERSIÓN Y APIS ================== -->
-            <section id="panel-inversiones" class="panel-contenido" role="tabpanel" tabindex="-1" aria-label="Inversión y APIs gratuitas">
+            <section id="panel-inversiones" class="panel-contenido" role="tabpanel" tabindex="-1" aria-labelledby="tab-recursos">
                 <div class="aviso aviso--exito">
                     <span class="icono-aviso" aria-hidden="true"><i data-lucide="trending-up"></i></span>
                     <div class="contenido-aviso">
@@ -618,23 +776,23 @@
 
     <!-- ============================= NAVEGACIÓN INFERIOR MÓVIL ============================= -->
     <nav class="nav-inferior" aria-label="Navegación principal">
-        <button type="button" class="item-nav" aria-selected="true" data-pestana="panel-gastos">
+        <button type="button" class="item-nav" aria-current="page" data-accion-nav="inicio">
+            <i data-lucide="home" aria-hidden="true"></i>
+            <span>Inicio</span>
+        </button>
+        <button type="button" class="item-nav" data-pestana="panel-gastos">
             <i data-lucide="list-checks" aria-hidden="true"></i>
-            <span>Partidas</span>
+            <span>Presupuesto</span>
         </button>
-        <button type="button" class="item-nav" aria-selected="false" data-pestana="panel-lugares">
+        <button type="button" class="item-nav" data-pestana="panel-lugares">
             <i data-lucide="store" aria-hidden="true"></i>
-            <span>Sobres</span>
+            <span>Gastos</span>
         </button>
-        <button type="button" class="item-nav" aria-selected="false" data-pestana="panel-canales">
-            <i data-lucide="arrow-left-right" aria-hidden="true"></i>
-            <span>Bicanal</span>
+        <button type="button" class="item-nav" data-pestana="panel-deudas">
+            <i data-lucide="credit-card" aria-hidden="true"></i>
+            <span>Deudas</span>
         </button>
-        <button type="button" class="item-nav" aria-selected="false" data-pestana="panel-excel">
-            <i data-lucide="table-2" aria-hidden="true"></i>
-            <span>Proyección</span>
-        </button>
-        <button type="button" class="item-nav" id="boton-mas-movil" aria-selected="false">
+        <button type="button" class="item-nav" id="boton-mas-movil" aria-expanded="false" aria-controls="panel-acciones">
             <i data-lucide="layout-grid" aria-hidden="true"></i>
             <span>Más</span>
         </button>
@@ -652,22 +810,43 @@
         <span class="asa-panel" aria-hidden="true"></span>
 
         <p class="titulo-panel">Más secciones</p>
+        <button type="button" class="accion-panel" data-pestana="panel-canales">
+            <i data-lucide="arrow-left-right" aria-hidden="true"></i>
+            <span>
+                Banco y efectivo
+                <span class="detalle-accion">Comprueba de dónde sale cada pago</span>
+            </span>
+        </button>
+        <button type="button" class="accion-panel" data-pestana="panel-excel">
+            <i data-lucide="table-2" aria-hidden="true"></i>
+            <span>
+                Futuro estimado
+                <span class="detalle-accion">Evolución de 6 meses a 5 años</span>
+            </span>
+        </button>
         <button type="button" class="accion-panel" data-pestana="panel-graficos">
             <i data-lucide="bar-chart-3" aria-hidden="true"></i>
             <span>
-                Gráficos
+                Análisis
                 <span class="detalle-accion">Categorías, canales y patrimonio</span>
             </span>
         </button>
         <button type="button" class="accion-panel" data-pestana="panel-inversiones">
             <i data-lucide="trending-up" aria-hidden="true"></i>
             <span>
-                Inversión y APIs
-                <span class="detalle-accion">Fuentes gratuitas de cotizaciones</span>
+                Recursos
+                <span class="detalle-accion">Fuentes externas y privacidad</span>
             </span>
         </button>
 
         <p class="titulo-panel">Tus datos</p>
+        <button type="button" class="accion-panel" data-accion="importar-movimientos">
+            <i data-lucide="file-input" aria-hidden="true"></i>
+            <span>
+                Importar movimientos CSV
+                <span class="detalle-accion">Lee un extracto bancario solo en tu dispositivo</span>
+            </span>
+        </button>
         <button type="button" class="accion-panel" data-accion="excel">
             <i data-lucide="file-spreadsheet" aria-hidden="true"></i>
             <span>
@@ -786,6 +965,140 @@
                 <div class="pie-modal">
                     <button type="button" id="boton-cancelar-modal" class="boton boton--secundario">Cancelar</button>
                     <button type="submit" class="boton boton--primario">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================= MODAL DE DEUDA ============================= -->
+    <div id="modal-deuda" class="fondo-modal" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-deuda">
+        <div class="caja-modal">
+            <div class="cabecera-modal">
+                <h2 id="titulo-modal-deuda" class="titulo-modal">Añadir deuda u obligación</h2>
+                <button type="button" id="boton-cerrar-modal-deuda" class="boton-icono" aria-label="Cerrar modal de deuda">
+                    <i data-lucide="x" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <form id="formulario-deuda">
+                <div class="cuerpo-modal">
+                    <div class="campo">
+                        <label class="etiqueta-campo" for="campo-deuda-concepto">Acreedor o concepto de la deuda</label>
+                        <input type="text" id="campo-deuda-concepto" name="concepto" placeholder="Préstamo coche, tarjeta de crédito, compra financiada…" required autocomplete="off">
+                    </div>
+
+                    <div class="campo">
+                        <label class="etiqueta-campo" for="campo-deuda-total">Total pendiente adeudado</label>
+                        <div class="envoltorio-euro">
+                            <input type="text" id="campo-deuda-total" name="importeTotal" class="campo-monetario" placeholder="0,00" inputmode="decimal" enterkeyhint="next" autocomplete="off" required>
+                            <span class="simbolo-euro" aria-hidden="true">€</span>
+                        </div>
+                    </div>
+
+                    <div class="campo">
+                        <label class="etiqueta-campo" for="campo-deuda-modo">
+                            <i data-lucide="sliders-horizontal" aria-hidden="true"></i>
+                            ¿Cómo quieres definirla?
+                        </label>
+                        <select id="campo-deuda-modo" name="modoDefinicion" class="control" aria-describedby="texto-estimacion-deuda">
+                            <option value="CUOTA">Sé cuánto pago al mes</option>
+                            <option value="PLAZO">Sé cuánto tiempo durará</option>
+                        </select>
+                    </div>
+
+                    <div class="campo" id="grupo-deuda-cuota">
+                        <label class="etiqueta-campo" for="campo-deuda-cuota">Cuota mensual a pagar</label>
+                        <div class="envoltorio-euro">
+                            <input type="text" id="campo-deuda-cuota" name="cuotaMensual" class="campo-monetario" placeholder="0,00" inputmode="decimal" enterkeyhint="done" autocomplete="off">
+                            <span class="simbolo-euro" aria-hidden="true">€</span>
+                        </div>
+                    </div>
+
+                    <div class="campo oculto" id="grupo-deuda-plazo">
+                        <label class="etiqueta-campo" for="campo-deuda-plazo-valor">¿Cuánto durará la deuda?</label>
+                        <div class="fila-plazo-deuda">
+                            <input type="text" id="campo-deuda-plazo-valor" name="plazoValor" class="control" placeholder="12" inputmode="decimal" enterkeyhint="done" autocomplete="off" aria-describedby="ayuda-deuda-plazo">
+                            <select id="campo-deuda-plazo-unidad" name="plazoUnidad" class="control" aria-label="Unidad de tiempo">
+                                <option value="DIAS">días</option>
+                                <option value="MESES" selected>meses</option>
+                                <option value="ANIOS">años</option>
+                            </select>
+                        </div>
+                        <span class="ayuda-campo" id="ayuda-deuda-plazo">Días y años se convierten a meses completos.</span>
+                    </div>
+
+                    <div class="caja-estimacion-deuda" id="caja-estimacion-deuda">
+                        <i data-lucide="calculator" aria-hidden="true"></i>
+                        <span id="texto-estimacion-deuda" aria-live="polite">Indica el total adeudado y la cuota para estimar los meses de pago.</span>
+                    </div>
+
+                    <div class="campo">
+                        <label class="etiqueta-campo" for="campo-deuda-canal">Canal de pago</label>
+                        <select id="campo-deuda-canal" name="canal" class="control">
+                            <option value="Cuenta Bancaria">Cuenta bancaria (tarjeta / domiciliación)</option>
+                            <option value="Efectivo Físico">Efectivo en mano (pago en billetes)</option>
+                        </select>
+                    </div>
+
+                    <div class="campo">
+                        <label class="etiqueta-campo" for="campo-deuda-notas">Notas u observaciones (opcional)</label>
+                        <textarea id="campo-deuda-notas" name="notas" rows="2" placeholder="TIN/TAE, cuotas restantes, fecha de vencimiento…"></textarea>
+                    </div>
+
+                </div>
+
+                <div class="pie-modal">
+                    <button type="button" id="boton-cancelar-modal-deuda" class="boton boton--secundario">Cancelar</button>
+                    <button type="submit" class="boton boton--primario">Guardar deuda</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================= MODAL DE AMORTIZACIÓN ============================= -->
+    <div id="modal-amortizar" class="fondo-modal" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-amortizar">
+        <div class="caja-modal">
+            <div class="cabecera-modal">
+                <h2 id="titulo-modal-amortizar" class="titulo-modal">Amortizar deuda</h2>
+                <button type="button" id="boton-cerrar-modal-amortizar" class="boton-icono" aria-label="Cerrar modal de amortización">
+                    <i data-lucide="x" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <form id="formulario-amortizar">
+                <div class="cuerpo-modal">
+                    <p class="descripcion-amortizar" id="descripcion-amortizar-concepto">
+                        Registra un abono para reducir el saldo pendiente y acortar el tiempo hasta quedar libre de deuda.
+                    </p>
+
+                    <div class="caja-estado-amortizar">
+                        <div>
+                            <span class="etiqueta-estado">Saldo pendiente actual:</span>
+                            <strong id="amortizar-saldo-actual">0,00 €</strong>
+                        </div>
+                        <div>
+                            <span class="etiqueta-estado">Cuota mensual:</span>
+                            <strong id="amortizar-cuota-actual">0,00 €</strong>
+                        </div>
+                    </div>
+
+                    <div class="campo">
+                        <label class="etiqueta-campo" for="campo-amortizar-importe">Cantidad a amortizar / abonar</label>
+                        <div class="envoltorio-euro">
+                            <input type="text" id="campo-amortizar-importe" name="importeAmortizar" class="campo-monetario" placeholder="0,00" inputmode="decimal" enterkeyhint="done" autocomplete="off" required>
+                            <span class="simbolo-euro" aria-hidden="true">€</span>
+                        </div>
+                    </div>
+
+                    <div class="caja-estimacion-deuda" id="caja-resultado-amortizar">
+                        <i data-lucide="sparkles" aria-hidden="true"></i>
+                        <span id="texto-resultado-amortizar">Introduce la cantidad para ver el saldo restante y los meses ahorrados.</span>
+                    </div>
+                </div>
+
+                <div class="pie-modal">
+                    <button type="button" id="boton-cancelar-modal-amortizar" class="boton boton--secundario">Cancelar</button>
+                    <button type="submit" class="boton boton--primario">Confirmar abono</button>
                 </div>
             </form>
         </div>

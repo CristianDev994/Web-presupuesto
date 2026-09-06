@@ -2,8 +2,8 @@
 // Los importes se escriben como NÚMEROS reales en euros (no como texto) para que
 // Excel pueda sumarlos, y con formato de moneda española aplicado a cada celda.
 
-import { CATEGORIAS_GASTO, CANALES_PAGO, SUBTIPOS_PATRIMONIO } from './datos_iniciales.js';
-import { aEuros, formatearEuros, formatearPorcentaje } from './utilidades_dinero.js';
+import { CATEGORIAS_GASTO, CANALES_PAGO, SUBTIPOS_PATRIMONIO, REFERENCIA_CARGA_DEUDA } from './datos_iniciales.js';
+import { aEuros, formatearEuros, formatearPorcentaje, calcularPorcentaje } from './utilidades_dinero.js';
 
 /** Marca un importe en centimos como celda monetaria de la hoja. */
 const moneda = (centimos) => ({ esMoneda: true, valor: aEuros(centimos) });
@@ -25,15 +25,21 @@ export class ExportadorExcel {
 
         try {
             const libro = XLSX.utils.book_new();
+            const mesesHorizonte = this.gestor.horizonteMeses || 6;
 
-            XLSX.utils.book_append_sheet(libro, this.construirHojaProyeccion(), 'Presupuesto_6_Meses');
+            XLSX.utils.book_append_sheet(libro, this.construirHojaProyeccion(), `Presupuesto_${mesesHorizonte}_Meses`);
             XLSX.utils.book_append_sheet(libro, this.construirHojaComprasLugares(), 'Gastos_Por_Lugares');
             XLSX.utils.book_append_sheet(libro, this.construirHojaCanalesPago(), 'Cuenta_vs_Fisico');
             XLSX.utils.book_append_sheet(libro, this.construirHojaDesglosePartidas(), 'Desglose_Partidas');
+
+            if (this.gestor.deudas && this.gestor.deudas.length > 0) {
+                XLSX.utils.book_append_sheet(libro, this.construirHojaDeudas(), 'Deudas_Y_Compromisos');
+            }
+
             XLSX.utils.book_append_sheet(libro, this.construirHojaDiagnostico(), 'Salud_Financiera');
 
             XLSX.writeFile(libro, `Mi_Presupuesto_${this.gestor.obtenerFechaHoy()}.xlsx`);
-            return { exito: true, mensaje: 'Excel generado correctamente.' };
+            return { exito: true, mensaje: 'Excel generado correctamente con todas las hojas de cálculo.' };
         } catch (error) {
             return { exito: false, mensaje: `No se pudo generar el Excel: ${error.message}` };
         }
@@ -80,7 +86,7 @@ export class ExportadorExcel {
         const resumen = this.gestor.calcularResumenMes(1);
 
         const filas = [
-            ['PLANIFICACIÓN FINANCIERA Y PROYECCIÓN A 6 MESES'],
+            [`PLANIFICACIÓN FINANCIERA Y PROYECCIÓN A ${totales.meses} MESES`],
             [`Ingreso neto mensual: ${formatearEuros(resumen.ingresoCent)} (${formatearEuros(resumen.ingresoCuentaCent)} en banco + ${formatearEuros(resumen.ingresoFisicoCent)} en efectivo)`],
             ['Generado con el Gestor de Presupuesto Personal Universal. Importes exactos al céntimo.'],
             [],
@@ -319,10 +325,12 @@ export class ExportadorExcel {
             ['Balance del mes', moneda(resumen.balanceNetoCent), resumen.balanceNetoCent === 0 ? 'Cuentas cuadradas al céntimo' : resumen.mensajeEstado],
             ['Porcentaje del sueldo asignado', formatearPorcentaje(resumen.porcentajeAsignado), resumen.porcentajeAsignado === 100 ? 'Todo el sueldo tiene un destino' : 'Aún queda sueldo sin destino asignado'],
             ['Tasa de ahorro real', formatearPorcentaje(resumen.porcentajeAhorroReal), 'Ahorro + inversión + excedente sobre el ingreso'],
+            ['Cuotas de deuda del mes', moneda(resumen.cargaDeuda.cuotaDeudaCent), `${formatearEuros(resumen.cargaDeuda.euroPorCada100Cent)} de cada 100 € que ingresas`],
+            ['Parte del sueldo en deudas', formatearPorcentaje(resumen.cargaDeuda.porcentaje), `${resumen.cargaDeuda.etiqueta}. ${resumen.cargaDeuda.resumen}`],
             ['Número de partidas activas', resumen.numeroPartidas, 'Partidas vigentes en el mes 1'],
             [],
-            ['PROYECCIÓN A 6 MESES'],
-            ['Ingresos acumulados', moneda(totales.ingresosCent), 'Suma de los seis meses'],
+            [`PROYECCIÓN A ${totales.meses} MESES`],
+            ['Ingresos acumulados', moneda(totales.ingresosCent), `Suma de los ${totales.meses} meses`],
             ['Consumo acumulado', moneda(totales.consumoCent), 'Gasto corriente total'],
             ['Ahorro acumulado', moneda(totales.ahorroCent), 'Colchón al final del periodo'],
             ['Inversión acumulada', moneda(totales.inversionCent), 'Capital invertido al final del periodo'],
@@ -333,5 +341,79 @@ export class ExportadorExcel {
         ];
 
         return this.prepararHoja(filas, [{ wch: 34 }, { wch: 20 }, { wch: 62 }]);
+    }
+
+    // ----------------------------------------------------------------------
+    // HOJA 6: DEUDAS Y COMPROMISOS FINANCIEROS
+    // ----------------------------------------------------------------------
+    construirHojaDeudas() {
+        const deudas = this.gestor.deudas || [];
+        const totalPendienteCent = this.gestor.calcularTotalDeudaPendienteCent();
+        const totalCuotaCent = this.gestor.calcularCuotaMensualTotalDeudasCent();
+        const mesesLibertad = this.gestor.calcularMesesParaLibertadDeDeudas();
+
+        const carga = this.gestor.calcularCargaDeuda(1);
+
+        const filas = [
+            ['REGISTRO Y SEGUIMIENTO DE DEUDAS Y COMPROMISOS'],
+            [`Total pendiente: ${formatearEuros(totalPendienteCent)} · Cuota mensual global: ${formatearEuros(totalCuotaCent)} · Meses para libertad de deudas: ${mesesLibertad}`],
+            [`Parte del sueldo destinada a deudas: ${formatearPorcentaje(carga.porcentaje)} (${formatearEuros(carga.euroPorCada100Cent)} de cada 100 € ingresados) · ${carga.etiqueta}`],
+            ['Plan de amortización sincronizado automáticamente con el presupuesto mensual y la proyección.'],
+            [],
+            [
+                'Acreedor / Concepto',
+                'Saldo pendiente',
+                'Cuota mensual',
+                '% del sueldo',
+                'Canal de pago',
+                'Meses restantes',
+                'Estado',
+                'Notas'
+            ]
+        ];
+
+        deudas.forEach(deuda => {
+            const mesesRestantes = this.gestor.calcularMesesRestantesDeuda(deuda);
+            const activa = !deuda.pagada && deuda.importeTotalCent > 0;
+            const cuotaEfectivaCent = Math.min(deuda.importeTotalCent, deuda.cuotaMensualCent);
+
+            filas.push([
+                deuda.concepto,
+                moneda(deuda.importeTotalCent),
+                moneda(deuda.cuotaMensualCent),
+                activa ? formatearPorcentaje(calcularPorcentaje(cuotaEfectivaCent, carga.ingresoCent, 1)) : '—',
+                deuda.canal,
+                mesesRestantes > 0 ? mesesRestantes : 'Liquidada',
+                activa ? 'Activa' : 'Liquidada',
+                deuda.notas || ''
+            ]);
+        });
+
+        filas.push([]);
+        filas.push([
+            `TOTAL COMPROMISOS (${deudas.length} registrados)`,
+            moneda(totalPendienteCent),
+            moneda(totalCuotaCent),
+            formatearPorcentaje(carga.porcentaje),
+            '',
+            mesesLibertad,
+            '',
+            ''
+        ]);
+        filas.push([]);
+        filas.push(['REFERENCIA DE CARGA DE DEUDA']);
+        filas.push(['Ingreso neto del mes', moneda(carga.ingresoCent), '', '', '', '', '', '']);
+        filas.push(['Cuota máxima dentro de la referencia', moneda(carga.cuotaMaximaRecomendadaCent), '', `${carga.limiteRecomendado} %`, '', '', '', '']);
+        filas.push([
+            carga.superaReferencia ? 'Exceso sobre la referencia' : 'Margen disponible hasta la referencia',
+            moneda(carga.superaReferencia ? carga.excesoSobreReferenciaCent : carga.margenHastaReferenciaCent),
+            '', '', '', '', '', ''
+        ]);
+        filas.push([REFERENCIA_CARGA_DEUDA.fuente]);
+
+        return this.prepararHoja(filas, [
+            { wch: 30 }, { wch: 22 }, { wch: 18 }, { wch: 16 },
+            { wch: 18 }, { wch: 16 }, { wch: 14 }, { wch: 40 }
+        ]);
     }
 }

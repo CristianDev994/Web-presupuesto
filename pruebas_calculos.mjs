@@ -15,6 +15,7 @@ const {
     dividirEnPartes, formatearEuros, calcularPorcentaje, sumarCentimos
 } = await import('./utilidades_dinero.js');
 const { GestorFinanciero } = await import('./gestor_financiero.js');
+const { ExportadorExcel } = await import('./exportador_excel.js');
 const { PERFILES_PRESUPUESTO, CANALES_PAGO } = await import('./datos_iniciales.js');
 
 let pruebas = 0;
@@ -326,6 +327,416 @@ comprobar('formato de moneda es-ES', () => {
     assert.equal(norm(formatearEuros(12345, { conSigno: true })), '+123,45 €');
     assert.equal(calcularPorcentaje(3300, 10000, 1), 33);
     assert.equal(calcularPorcentaje(3333, 10000, 1), 33.3);
+});
+
+console.log('\n== 10. Gestión integral de deudas ==');
+comprobar('crear y calcular métricas de deuda pendiente', () => {
+    const gestor = new GestorFinanciero();
+    gestor.reiniciarPresupuestoEnBlanco();
+    gestor.ingresoCuentaCent = aCentimos(1200);
+
+    const deuda1 = gestor.agregarDeuda({
+        concepto: 'Préstamo Coche',
+        importeTotal: 2400,
+        cuotaMensual: 200,
+        canal: CANALES_PAGO.CUENTA
+    });
+
+    assert.equal(deuda1.importeTotalCent, 240000);
+    assert.equal(deuda1.cuotaMensualCent, 20000);
+    assert.equal(gestor.calcularTotalDeudaPendienteCent(), 240000);
+    assert.equal(gestor.calcularCuotaMensualTotalDeudasCent(), 20000);
+    assert.equal(gestor.calcularMesesRestantesDeuda(deuda1), 12);
+    assert.equal(gestor.calcularMesesParaLibertadDeDeudas(), 12);
+
+    // Debe existir la partida de gasto vinculada en el presupuesto
+    const gastoVinculado = gestor.gastos.find(g => g.idDeuda === deuda1.id);
+    assert.ok(gastoVinculado);
+    assert.equal(gastoVinculado.importeCent, 20000);
+    assert.equal(gastoVinculado.categoria, 'DEUDAS_OBLIGACIONES');
+    assert.equal(gastoVinculado.mesFiniquito, 12);
+});
+
+comprobar('amortización extraordinaria reduce saldo y meses restantes', () => {
+    const gestor = new GestorFinanciero();
+    gestor.reiniciarPresupuestoEnBlanco();
+    const deuda = gestor.agregarDeuda({
+        concepto: 'Tarjeta Crédito',
+        importeTotal: 1000,
+        cuotaMensual: 100,
+        canal: CANALES_PAGO.CUENTA
+    });
+
+    assert.equal(gestor.calcularMesesRestantesDeuda(deuda), 10);
+
+    // Amortizar 400 €
+    gestor.amortizarDeuda(deuda.id, aCentimos(400));
+    assert.equal(deuda.importeTotalCent, 60000);
+    assert.equal(deuda.totalAmortizadoCent, 40000);
+    assert.equal(gestor.calcularMesesRestantesDeuda(deuda), 6);
+
+    const gastoActualizado = gestor.gastos.find(g => g.idDeuda === deuda.id);
+    assert.equal(gastoActualizado.mesFiniquito, 6);
+});
+
+comprobar('liquidación total de deuda la marca como pagada y retira la cuota', () => {
+    const gestor = new GestorFinanciero();
+    gestor.reiniciarPresupuestoEnBlanco();
+    const deuda = gestor.agregarDeuda({
+        concepto: 'Deuda Pequeña',
+        importeTotal: 150,
+        cuotaMensual: 50,
+        canal: CANALES_PAGO.CUENTA
+    });
+
+    // Amortizar todo el saldo restante
+    gestor.amortizarDeuda(deuda.id, aCentimos(150));
+    assert.equal(deuda.importeTotalCent, 0);
+    assert.equal(deuda.pagada, true);
+    assert.equal(gestor.calcularTotalDeudaPendienteCent(), 0);
+
+    // Ya no debe haber partida de gasto activa para esa deuda
+    const gasto = gestor.gastos.find(g => g.idDeuda === deuda.id);
+    assert.equal(gasto, undefined);
+});
+
+comprobar('deudas y horizonte configurable en proyección y persistencia JSON', () => {
+    const gestor = new GestorFinanciero();
+    gestor.reiniciarPresupuestoEnBlanco();
+    gestor.ingresoCuentaCent = aCentimos(1000);
+    gestor.establecerHorizonteMeses(12);
+    assert.equal(gestor.horizonteMeses, 12);
+
+    gestor.agregarDeuda({
+        concepto: 'Financiación Portátil',
+        importeTotal: 300,
+        cuotaMensual: 100,
+        canal: CANALES_PAGO.CUENTA
+    });
+
+    const proyeccion = gestor.calcularProyeccion(12);
+    assert.equal(proyeccion.length, 12);
+    // En los meses 1, 2 y 3 hay cuota de deuda de 100 €
+    assert.equal(proyeccion[0].deudasCent, 10000);
+    assert.equal(proyeccion[1].deudasCent, 10000);
+    assert.equal(proyeccion[2].deudasCent, 10000);
+    // En el mes 4 la deuda ya está liquidada y deudasCent es 0
+    assert.equal(proyeccion[3].deudasCent, 0);
+
+    // Persistencia en JSON
+    const jsonExportado = gestor.exportarCopiaSeguridadJSON();
+    const gestorRestaurado = new GestorFinanciero();
+    gestorRestaurado.reiniciarPresupuestoEnBlanco();
+    const resultado = gestorRestaurado.importarCopiaSeguridadJSON(jsonExportado);
+    assert.ok(resultado.exito);
+    assert.equal(gestorRestaurado.deudas.length, 1);
+    assert.equal(gestorRestaurado.deudas[0].concepto, 'Financiación Portátil');
+    assert.equal(gestorRestaurado.deudas[0].importeTotalCent, 30000);
+    assert.equal(gestorRestaurado.horizonteMeses, 12);
+});
+
+comprobar('exportación a Excel incluye hoja de deudas con datos estructurados', () => {
+    globalThis.XLSX = {
+        utils: {
+            aoa_to_sheet: (datos) => ({ '!datos': datos }),
+            encode_cell: ({ r, c }) => `${String.fromCharCode(65 + c)}${r + 1}`
+        }
+    };
+
+    const gestor = new GestorFinanciero();
+    gestor.reiniciarPresupuestoEnBlanco();
+    gestor.ingresoCuentaCent = 200000;
+    gestor.agregarDeuda({ concepto: 'Prestamo coche', importeTotal: 6000, cuotaMensual: 300, canal: CANALES_PAGO.CUENTA });
+
+    const exportador = new ExportadorExcel(gestor);
+    const hojaDeudas = exportador.construirHojaDeudas();
+    assert.ok(hojaDeudas && hojaDeudas['!datos']);
+
+    const filas = hojaDeudas['!datos'];
+    const cabecera = filas.find(f => Array.isArray(f) && f[0] === 'Acreedor / Concepto');
+    assert.ok(cabecera, 'falta la fila de cabecera');
+
+    const filaDeuda = filas[filas.indexOf(cabecera) + 1];
+    // Los campos deben coincidir con el modelo real: nada de columnas vacias
+    assert.equal(filaDeuda[0], 'Prestamo coche');
+    assert.equal(filaDeuda[1], 6000);              // saldo pendiente, en euros
+    assert.equal(filaDeuda[2], 300);               // cuota mensual
+    assert.equal(filaDeuda[3], '15 %');            // parte del sueldo
+    assert.equal(filaDeuda[5], 20);                // meses restantes
+    assert.equal(filaDeuda[6], 'Activa');
+    filaDeuda.forEach((celda, indice) => {
+        assert.ok(celda !== undefined && celda !== null, `columna ${indice} sin valor`);
+    });
+});
+
+comprobar('amortizar interpreta siempre centimos, tambien importes pequenos', () => {
+    // La interfaz envía céntimos: 5 € deben descontar 5 €, nunca 500 €
+    for (const euros of [1, 5, 10, 10.5, 15, 999, 1000, 1500]) {
+        const g = new GestorFinanciero();
+        g.reiniciarPresupuestoEnBlanco();
+        g.agregarDeuda({ concepto: 'Prueba', importeTotal: 6000, cuotaMensual: 300, canal: CANALES_PAGO.CUENTA });
+        g.amortizarDeuda(g.deudas[0].id, aCentimos(euros));
+        assert.equal(g.deudas[0].totalAmortizadoCent, aCentimos(euros), `amortizando ${euros} €`);
+        assert.equal(g.deudas[0].importeTotalCent, aCentimos(6000) - aCentimos(euros), `saldo tras amortizar ${euros} €`);
+    }
+});
+
+console.log('\n== 11. Parte del sueldo que se va en deudas ==');
+
+comprobar('el porcentaje sobre el sueldo es exacto', () => {
+    const g = new GestorFinanciero();
+    g.reiniciarPresupuestoEnBlanco();
+    g.ingresoCuentaCent = aCentimos(1500);
+    g.ingresoFisicoCent = aCentimos(500);          // 2.000,00 € netos
+    g.agregarGasto({ concepto: 'Prestamo coche', importe: 300, categoria: 'DEUDAS_OBLIGACIONES', canal: CANALES_PAGO.CUENTA });
+    g.agregarGasto({ concepto: 'Tarjeta', importe: 200, categoria: 'DEUDAS_OBLIGACIONES', canal: CANALES_PAGO.CUENTA });
+    g.agregarGasto({ concepto: 'Compra', importe: 400, categoria: 'VIVIENDA_COMIDA', canal: CANALES_PAGO.FISICO });
+
+    const carga = g.calcularCargaDeuda(1);
+    assert.equal(carga.cuotaDeudaCent, 50000);
+    assert.equal(carga.porcentaje, 25);                    // 500 de 2000
+    assert.equal(carga.ingresoLibreCent, 150000);
+    assert.equal(carga.euroPorCada100Cent, 2500);          // 25,00 € de cada 100 €
+    assert.equal(carga.nivel, 'razonable');
+    assert.equal(carga.superaReferencia, false);
+    assert.equal(carga.cuotaMaximaRecomendadaCent, 70000); // 35 % de 2.000 €
+    assert.equal(carga.margenHastaReferenciaCent, 20000);
+    assert.equal(carga.excesoSobreReferenciaCent, 0);
+});
+
+comprobar('el resumen mensual expone la misma cifra que el calculo directo', () => {
+    const g = new GestorFinanciero();
+    g.reiniciarPresupuestoEnBlanco();
+    g.cargarCasoEjemplo();
+    for (let mes = 1; mes <= 6; mes++) {
+        const r = g.calcularResumenMes(mes);
+        const carga = g.calcularCargaDeuda(mes);
+        assert.equal(r.cargaDeuda.cuotaDeudaCent, r.deudasCent, `mes ${mes}: la carga no coincide con las deudas del resumen`);
+        assert.equal(r.cargaDeuda.porcentaje, carga.porcentaje, `mes ${mes}: porcentaje distinto`);
+        assert.equal(r.porcentajeDeudaSobreIngreso, carga.porcentaje, `mes ${mes}: campo del resumen distinto`);
+        // La parte de deuda mas lo que queda libre reconstruye el ingreso
+        assert.equal(carga.cuotaDeudaCent + carga.ingresoLibreCent, r.ingresoCent, `mes ${mes}: no cuadra con el ingreso`);
+    }
+});
+
+comprobar('los tramos se asignan en los limites exactos', () => {
+    const g = new GestorFinanciero();
+    const casos = [
+        [0, 'sin_deuda'],
+        [10, 'holgado'],
+        [15, 'holgado'],
+        [15.1, 'razonable'],
+        [30, 'razonable'],
+        [30.1, 'ajustado'],
+        [35, 'ajustado'],
+        [35.1, 'elevado'],
+        [80, 'elevado']
+    ];
+    for (const [porcentaje, nivelEsperado] of casos) {
+        g.reiniciarPresupuestoEnBlanco();
+        g.ingresoCuentaCent = 100000;                       // 1.000,00 €
+        if (porcentaje > 0) {
+            g.agregarGasto({
+                concepto: 'Cuota', importe: porcentaje * 10,
+                categoria: 'DEUDAS_OBLIGACIONES', canal: CANALES_PAGO.CUENTA
+            });
+        }
+        const carga = g.calcularCargaDeuda(1);
+        assert.equal(carga.porcentaje, porcentaje, `porcentaje calculado para ${porcentaje}`);
+        assert.equal(carga.nivel, nivelEsperado, `tramo para ${porcentaje} %`);
+    }
+});
+
+comprobar('superar la referencia calcula el exceso exacto', () => {
+    const g = new GestorFinanciero();
+    g.reiniciarPresupuestoEnBlanco();
+    g.ingresoCuentaCent = aCentimos(1200);
+    g.agregarGasto({ concepto: 'Prestamo', importe: 600, categoria: 'DEUDAS_OBLIGACIONES', canal: CANALES_PAGO.CUENTA });
+
+    const carga = g.calcularCargaDeuda(1);
+    assert.equal(carga.porcentaje, 50);
+    assert.equal(carga.nivel, 'elevado');
+    assert.equal(carga.superaReferencia, true);
+    assert.equal(carga.cuotaMaximaRecomendadaCent, 42000);  // 35 % de 1.200 €
+    assert.equal(carga.excesoSobreReferenciaCent, 18000);   // 600 - 420
+    assert.equal(carga.margenHastaReferenciaCent, 0);
+});
+
+comprobar('sin ingresos no se inventa un porcentaje', () => {
+    const g = new GestorFinanciero();
+    g.reiniciarPresupuestoEnBlanco();
+    g.agregarGasto({ concepto: 'Deuda', importe: 100, categoria: 'DEUDAS_OBLIGACIONES', canal: CANALES_PAGO.CUENTA });
+    const carga = g.calcularCargaDeuda(1);
+    assert.equal(carga.ingresoCent, 0);
+    assert.equal(carga.porcentaje, 0);
+    assert.equal(carga.euroPorCada100Cent, 0);
+    assert.equal(carga.cuotaMaximaRecomendadaCent, 0);
+});
+
+comprobar('la carga baja sola al liquidarse las deudas', () => {
+    const g = new GestorFinanciero();
+    g.reiniciarPresupuestoEnBlanco();
+    g.ingresoCuentaCent = aCentimos(1000);
+    g.agregarDeuda({ concepto: 'Prestamo corto', importeTotal: 600, cuotaMensual: 300, canal: CANALES_PAGO.CUENTA });
+
+    assert.equal(g.calcularCargaDeuda(1).porcentaje, 30);
+    assert.equal(g.calcularCargaDeuda(2).porcentaje, 30);
+    assert.equal(g.calcularCargaDeuda(3).porcentaje, 0);   // liquidada tras dos cuotas
+    assert.equal(g.calcularCargaDeuda(3).nivel, 'sin_deuda');
+});
+
+comprobar('el mes de alivio senala cuando se baja de la referencia', () => {
+    const g = new GestorFinanciero();
+    g.reiniciarPresupuestoEnBlanco();
+    g.ingresoCuentaCent = aCentimos(1000);
+    // 500 €/mes durante 2 meses: 50 % del sueldo, por encima del 35 %
+    g.agregarDeuda({ concepto: 'Deuda fuerte', importeTotal: 1000, cuotaMensual: 500, canal: CANALES_PAGO.CUENTA });
+
+    assert.equal(g.calcularCargaDeuda(1).superaReferencia, true);
+    assert.equal(g.calcularMesAlivioCargaDeuda(1, 6), 3);
+
+    // Si no supera la referencia, no hay nada que anunciar
+    g.reiniciarPresupuestoEnBlanco();
+    g.ingresoCuentaCent = aCentimos(1000);
+    g.agregarDeuda({ concepto: 'Deuda pequena', importeTotal: 200, cuotaMensual: 100, canal: CANALES_PAGO.CUENTA });
+    assert.equal(g.calcularMesAlivioCargaDeuda(1, 6), null);
+});
+
+console.log('\n== 12. Duracion de las deudas en dias, meses y anios ==');
+
+comprobar('conversion de dias, meses y anios a meses completos', () => {
+    const g = new GestorFinanciero();
+    // Anios: multiplicacion exacta
+    assert.equal(g.convertirPlazoAMeses(1, 'ANIOS'), 12);
+    assert.equal(g.convertirPlazoAMeses(2, 'ANIOS'), 24);
+    assert.equal(g.convertirPlazoAMeses('1,5', 'ANIOS'), 18);
+    // Meses: se toman tal cual
+    assert.equal(g.convertirPlazoAMeses(18, 'MESES'), 18);
+    assert.equal(g.convertirPlazoAMeses('7', 'MESES'), 7);
+    // Dias: se redondean al alza porque una deuda de 40 dias ocupa 2 cuotas
+    assert.equal(g.convertirPlazoAMeses(30, 'DIAS'), 1);
+    assert.equal(g.convertirPlazoAMeses(31, 'DIAS'), 2);
+    assert.equal(g.convertirPlazoAMeses(40, 'DIAS'), 2);
+    assert.equal(g.convertirPlazoAMeses(365, 'DIAS'), 12);   // un anio natural
+    assert.equal(g.convertirPlazoAMeses(730, 'DIAS'), 24);   // dos anios naturales
+    // Valores invalidos no producen plazos absurdos
+    assert.equal(g.convertirPlazoAMeses(0, 'MESES'), 0);
+    assert.equal(g.convertirPlazoAMeses(-5, 'MESES'), 0);
+    assert.equal(g.convertirPlazoAMeses('abc', 'MESES'), 0);
+    assert.equal(g.convertirPlazoAMeses(0.4, 'MESES'), 1);   // nunca menos de un mes
+});
+
+comprobar('la cuota derivada del plazo liquida la deuda sin dejar resto', () => {
+    const g = new GestorFinanciero();
+    for (const [totalEuros, valor, unidad] of [
+        [6000, 12, 'MESES'], [6000, 1, 'ANIOS'], [5000, 7, 'MESES'],
+        [1234.56, 18, 'MESES'], [999.99, 2, 'ANIOS'], [300, 90, 'DIAS']
+    ]) {
+        const totalCent = aCentimos(totalEuros);
+        const plan = g.planificarDeudaPorPlazo(totalCent, valor, unidad);
+
+        // Con mesesReales cuotas se cubre exactamente el total, ni mas ni menos
+        const pagadoAntesDeLaUltima = plan.cuotaMensualCent * (plan.mesesReales - 1);
+        assert.ok(pagadoAntesDeLaUltima < totalCent, `${totalEuros} en ${valor} ${unidad}: sobra una cuota`);
+        assert.equal(pagadoAntesDeLaUltima + plan.ultimaCuotaCent, totalCent,
+            `${totalEuros} en ${valor} ${unidad}: las cuotas no suman el total`);
+        assert.ok(plan.ultimaCuotaCent > 0 && plan.ultimaCuotaCent <= plan.cuotaMensualCent,
+            `${totalEuros} en ${valor} ${unidad}: ultima cuota fuera de rango`);
+    }
+});
+
+comprobar('el plazo pedido se respeta y el motor coincide con el plan', () => {
+    const g = new GestorFinanciero();
+    g.reiniciarPresupuestoEnBlanco();
+    g.agregarDeuda({
+        concepto: 'Prestamo a 2 anios',
+        importeTotal: 6000,
+        modoDefinicion: 'PLAZO',
+        plazo: { valor: 2, unidad: 'ANIOS' },
+        canal: CANALES_PAGO.CUENTA
+    });
+
+    const deuda = g.deudas[0];
+    assert.equal(deuda.modoDefinicion, 'PLAZO');
+    assert.deepEqual(deuda.plazo, { valor: 2, unidad: 'ANIOS' });
+    assert.equal(deuda.cuotaMensualCent, 25000);                    // 6000 / 24
+    assert.equal(g.calcularMesesRestantesDeuda(deuda), 24);
+    // La partida del presupuesto se sincroniza con el plazo
+    const partida = g.gastos.find(x => x.idDeuda === deuda.id);
+    assert.equal(partida.importeCent, 25000);
+    assert.equal(partida.mesFiniquito, 24);
+});
+
+comprobar('cambiar el total recalcula la cuota si se definio por plazo', () => {
+    const g = new GestorFinanciero();
+    g.reiniciarPresupuestoEnBlanco();
+    g.agregarDeuda({
+        concepto: 'Financiacion', importeTotal: 1200, modoDefinicion: 'PLAZO',
+        plazo: { valor: 12, unidad: 'MESES' }, canal: CANALES_PAGO.CUENTA
+    });
+    assert.equal(g.deudas[0].cuotaMensualCent, 10000);   // 1200 / 12
+
+    g.actualizarDeuda(g.deudas[0].id, { importeTotalCent: aCentimos(2400) });
+    assert.equal(g.deudas[0].cuotaMensualCent, 20000);   // 2400 / 12, mismo plazo
+    assert.equal(g.calcularMesesRestantesDeuda(g.deudas[0]), 12);
+});
+
+comprobar('amortizar acorta el plazo en vez de rebajar la cuota', () => {
+    const g = new GestorFinanciero();
+    g.reiniciarPresupuestoEnBlanco();
+    g.agregarDeuda({
+        concepto: 'Prestamo', importeTotal: 1200, modoDefinicion: 'PLAZO',
+        plazo: { valor: 12, unidad: 'MESES' }, canal: CANALES_PAGO.CUENTA
+    });
+    assert.equal(g.calcularMesesRestantesDeuda(g.deudas[0]), 12);
+
+    g.amortizarDeuda(g.deudas[0].id, aCentimos(600));
+    assert.equal(g.deudas[0].cuotaMensualCent, 10000, 'la cuota no debe cambiar');
+    assert.equal(g.calcularMesesRestantesDeuda(g.deudas[0]), 6, 'el plazo debe acortarse');
+    // Una edicion posterior no debe deshacer la amortizacion recalculando la cuota
+    g.actualizarDeuda(g.deudas[0].id, { notas: 'revisada' });
+    assert.equal(g.calcularMesesRestantesDeuda(g.deudas[0]), 6);
+});
+
+comprobar('un plazo imposible informa de la duracion real', () => {
+    const g = new GestorFinanciero();
+    // 7 centimos no pueden repartirse en 5 cuotas mensuales constantes
+    const plan = g.planificarDeudaPorPlazo(7, 5, 'MESES');
+    assert.equal(plan.mesesSolicitados, 5);
+    assert.equal(plan.cuotaMensualCent, 2);
+    assert.equal(plan.mesesReales, 4);
+    assert.equal(plan.coincide, false);
+    // Aun asi las cuotas siguen sumando exactamente el total
+    assert.equal(plan.cuotaMensualCent * (plan.mesesReales - 1) + plan.ultimaCuotaCent, 7);
+});
+
+comprobar('el plazo se describe en lenguaje natural', () => {
+    const g = new GestorFinanciero();
+    assert.equal(g.describirPlazoEnMeses(1), '1 mes');
+    assert.equal(g.describirPlazoEnMeses(7), '7 meses');
+    assert.equal(g.describirPlazoEnMeses(12), '1 año');
+    assert.equal(g.describirPlazoEnMeses(18), '1 año y 6 meses');
+    assert.equal(g.describirPlazoEnMeses(24), '2 años');
+    assert.equal(g.describirPlazoEnMeses(25), '2 años y 1 mes');
+    assert.equal(g.describirPlazoEnMeses(0), 'Sin plazo');
+});
+
+comprobar('el plazo sobrevive a guardar y restaurar la copia JSON', () => {
+    const g = new GestorFinanciero();
+    g.reiniciarPresupuestoEnBlanco();
+    g.agregarDeuda({
+        concepto: 'Hipoteca', importeTotal: 60000, modoDefinicion: 'PLAZO',
+        plazo: { valor: 5, unidad: 'ANIOS' }, canal: CANALES_PAGO.CUENTA
+    });
+    const copia = g.exportarCopiaSeguridadJSON();
+
+    const g2 = new GestorFinanciero();
+    g2.reiniciarPresupuestoEnBlanco();
+    assert.ok(g2.importarCopiaSeguridadJSON(copia).exito);
+    assert.equal(g2.deudas[0].modoDefinicion, 'PLAZO');
+    assert.deepEqual(g2.deudas[0].plazo, { valor: 5, unidad: 'ANIOS' });
+    assert.equal(g2.deudas[0].cuotaMensualCent, g.deudas[0].cuotaMensualCent);
+    assert.equal(g2.calcularMesesRestantesDeuda(g2.deudas[0]), 60);
 });
 
 console.log(`\n${pruebas} bloques de prueba ejecutados.`);

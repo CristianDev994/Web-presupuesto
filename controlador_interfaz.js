@@ -30,6 +30,8 @@ export class ControladorInterfaz {
         this.exportador = new ExportadorExcel(this.gestor);
         this.filtroCanal = 'TODOS';
         this.idPartidaEnEdicion = null;
+        this.idDeudaEnEdicion = null;
+        this.idDeudaEnAmortizacion = null;
         this.graficos = {};
         this.pestanaActiva = 'panel-gastos';
         this.elementoConFocoPrevio = null;
@@ -43,11 +45,15 @@ export class ControladorInterfaz {
         this.configurarPanelAcciones();
         this.configurarNavegacion();
         this.configurarAsistente();
+        this.configurarBotonRapidoGasto();
         this.configurarFormularioCompra();
         this.configurarTablasInteractivas();
         this.configurarModalPartida();
+        this.configurarModalDeuda();
+        this.configurarModalAmortizar();
         this.configurarModalConfirmacion();
         this.configurarFiltros();
+        this.configurarSelectorHorizonte();
         this.configurarCopiasSeguridad();
         this.configurarRedimensionado();
         this.renderizarApis();
@@ -73,6 +79,34 @@ export class ControladorInterfaz {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
             window.lucide.createIcons();
         }
+        this.aplicarEstilosDinamicos();
+    }
+
+    /**
+     * Aplica anchos y colores calculados mediante la API de estilos del DOM.
+     * No se usan atributos style="" en las plantillas porque la política de
+     * seguridad de contenido (CSP) bloquea los estilos en línea: el atributo
+     * llegaría al DOM pero el navegador no lo aplicaría.
+     */
+    aplicarEstilosDinamicos(raiz = document) {
+        raiz.querySelectorAll('[data-ancho]').forEach(elemento => {
+            const ancho = Number.parseFloat(elemento.getAttribute('data-ancho'));
+            if (Number.isFinite(ancho)) {
+                elemento.style.width = `${Math.min(100, Math.max(0, ancho))}%`;
+            }
+        });
+
+        raiz.querySelectorAll('[data-fondo]').forEach(elemento => {
+            elemento.style.backgroundColor = elemento.getAttribute('data-fondo');
+        });
+
+        raiz.querySelectorAll('[data-color]').forEach(elemento => {
+            elemento.style.color = elemento.getAttribute('data-color');
+        });
+
+        raiz.querySelectorAll('[data-color-categoria]').forEach(elemento => {
+            elemento.style.setProperty('--color-categoria', elemento.getAttribute('data-color-categoria'));
+        });
     }
 
     mostrarAviso(mensaje, tipo = 'info') {
@@ -597,6 +631,37 @@ export class ControladorInterfaz {
 
         const botonNueva = this.obtener('boton-nueva-partida');
         if (botonNueva) botonNueva.addEventListener('click', () => this.abrirModalPartida(null));
+
+        const contenedorDeudas = this.obtener('contenedor-lista-deudas');
+        if (contenedorDeudas) {
+            contenedorDeudas.addEventListener('click', evento => {
+                const boton = evento.target.closest('[data-accion]');
+                if (!boton) return;
+
+                const accion = boton.getAttribute('data-accion');
+                const idDeuda = boton.getAttribute('data-id');
+
+                if (accion === 'amortizar-deuda') this.abrirModalAmortizar(idDeuda);
+                if (accion === 'editar-deuda') this.abrirModalDeuda(idDeuda);
+                if (accion === 'eliminar-deuda') this.eliminarDeudaConConfirmacion(idDeuda);
+            });
+        }
+    }
+
+    async eliminarDeudaConConfirmacion(idDeuda) {
+        const deuda = this.gestor.obtenerDeudaPorId(idDeuda);
+        if (!deuda) return;
+
+        const confirmado = await this.pedirConfirmacion({
+            titulo: 'Eliminar deuda',
+            texto: `Se eliminará la deuda de <strong>${this.escapar(deuda.concepto)}</strong> (saldo: ${formatearEuros(deuda.importeTotalCent)}). Su cuota mensual dejará de descontarse del presupuesto.`,
+            textoBoton: 'Eliminar deuda'
+        });
+        if (!confirmado) return;
+
+        this.gestor.eliminarDeuda(idDeuda);
+        this.actualizarVistaCompleta();
+        this.mostrarAviso('Deuda eliminada del registro.', 'exito');
     }
 
     async eliminarPartida(idGasto) {
@@ -750,6 +815,394 @@ export class ControladorInterfaz {
         return true;
     }
 
+    // ======================================================================
+    // ACCIONES RÁPIDAS Y SELECTOR DE HORIZONTE
+    // ======================================================================
+
+    configurarBotonRapidoGasto() {
+        const botonRapido = this.obtener('boton-rapido-gasto');
+        if (botonRapido) {
+            botonRapido.addEventListener('click', () => {
+                this.cambiarPestana('panel-lugares');
+                setTimeout(() => {
+                    const campoImporte = this.obtener('input-importe-compra');
+                    if (campoImporte) campoImporte.focus();
+                }, 280);
+            });
+        }
+    }
+
+    configurarSelectorHorizonte() {
+        const selector = this.obtener('selector-horizonte');
+        if (!selector) return;
+
+        selector.value = String(this.gestor.horizonteMeses);
+        selector.addEventListener('change', evento => {
+            const nuevoHorizonte = parseInt(evento.target.value, 10) || 6;
+            this.gestor.establecerHorizonteMeses(nuevoHorizonte);
+
+            const tituloProyeccion = this.obtener('titulo-proyeccion-meses');
+            if (tituloProyeccion) {
+                tituloProyeccion.textContent = `Proyección a ${nuevoHorizonte} meses`;
+            }
+
+            this.renderizarProyeccion();
+            if (this.pestanaActiva === 'panel-graficos') {
+                this.renderizarGraficos();
+            }
+            this.mostrarAviso(`Horizonte actualizado a ${nuevoHorizonte} meses.`, 'info');
+        });
+    }
+
+    // ======================================================================
+    // GESTIÓN DE DEUDAS: MODAL DE ALTA / EDICIÓN Y AMORTIZACIONES
+    // ======================================================================
+
+    configurarModalDeuda() {
+        const modal = this.obtener('modal-deuda');
+        const formulario = this.obtener('formulario-deuda');
+        const botonNuevaDeuda = this.obtener('boton-nueva-deuda');
+        const campoTotal = this.obtener('campo-deuda-total');
+        const campoCuota = this.obtener('campo-deuda-cuota');
+        const textoEstimacion = this.obtener('texto-estimacion-deuda');
+
+        if (botonNuevaDeuda) {
+            botonNuevaDeuda.addEventListener('click', () => this.abrirModalDeuda());
+        }
+
+        const cerrar = () => {
+            this.cerrarModal(modal);
+            this.idDeudaEnEdicion = null;
+        };
+
+        const botonCerrar = this.obtener('boton-cerrar-modal-deuda');
+        const botonCancelar = this.obtener('boton-cancelar-modal-deuda');
+        if (botonCerrar) botonCerrar.addEventListener('click', cerrar);
+        if (botonCancelar) botonCancelar.addEventListener('click', cerrar);
+
+        if (modal) {
+            modal.addEventListener('mousedown', evento => {
+                if (evento.target === modal) cerrar();
+            });
+        }
+
+        const campoModo = this.obtener('campo-deuda-modo');
+        const campoPlazoValor = this.obtener('campo-deuda-plazo-valor');
+        const campoPlazoUnidad = this.obtener('campo-deuda-plazo-unidad');
+
+        // Solo se muestra el campo que corresponde al modo elegido
+        const aplicarModo = () => {
+            const modo = campoModo ? campoModo.value : 'CUOTA';
+            const grupoCuota = this.obtener('grupo-deuda-cuota');
+            const grupoPlazo = this.obtener('grupo-deuda-plazo');
+            if (grupoCuota) grupoCuota.classList.toggle('oculto', modo !== 'CUOTA');
+            if (grupoPlazo) grupoPlazo.classList.toggle('oculto', modo !== 'PLAZO');
+            this.actualizarEstimacionDeuda();
+        };
+
+        if (campoModo) campoModo.addEventListener('change', aplicarModo);
+        this.aplicarModoDeuda = aplicarModo;
+
+        const alEscribir = () => this.actualizarEstimacionDeuda();
+        if (campoTotal) campoTotal.addEventListener('input', alEscribir);
+        if (campoCuota) campoCuota.addEventListener('input', alEscribir);
+        if (campoPlazoValor) campoPlazoValor.addEventListener('input', alEscribir);
+        if (campoPlazoUnidad) campoPlazoUnidad.addEventListener('change', alEscribir);
+
+        if (formulario) {
+            formulario.addEventListener('submit', evento => {
+                evento.preventDefault();
+                if (this.guardarDeudaDesdeFormulario(formulario)) cerrar();
+            });
+        }
+    }
+
+    /**
+     * Recalcula el resumen del modal de deuda: según el modo elegido estima la
+     * duración a partir de la cuota, o la cuota a partir de la duración.
+     */
+    actualizarEstimacionDeuda() {
+        const textoEstimacion = this.obtener('texto-estimacion-deuda');
+        if (!textoEstimacion) return;
+
+        const totalCent = aCentimos(this.valorCampo('campo-deuda-total'));
+        const modo = this.valorCampo('campo-deuda-modo') || 'CUOTA';
+
+        if (totalCent <= 0) {
+            textoEstimacion.textContent = modo === 'PLAZO'
+                ? 'Indica el total adeudado y cuánto durará para calcular la cuota mensual.'
+                : 'Indica el total adeudado y la cuota para estimar los meses de pago.';
+            return;
+        }
+
+        if (modo === 'PLAZO') {
+            const valorPlazo = this.valorCampo('campo-deuda-plazo-valor');
+            const unidadPlazo = this.valorCampo('campo-deuda-plazo-unidad') || 'MESES';
+
+            if (aCentimos(valorPlazo) <= 0) {
+                textoEstimacion.textContent = 'Indica cuánto durará la deuda para calcular la cuota mensual.';
+                return;
+            }
+
+            const plan = this.gestor.planificarDeudaPorPlazo(totalCent, valorPlazo, unidadPlazo);
+            const descripcion = this.gestor.describirPlazoEnMeses(plan.mesesReales);
+
+            let mensaje = `Pagarás ${formatearEuros(plan.cuotaMensualCent)} al mes durante ${descripcion}.`;
+
+            if (plan.ultimaCuotaCent > 0 && plan.ultimaCuotaCent !== plan.cuotaMensualCent) {
+                mensaje += ` La última cuota será de ${formatearEuros(plan.ultimaCuotaCent)}.`;
+            }
+            if (!plan.coincide) {
+                // Con importes muy pequeños repartidos en muchos meses no existe
+                // una cuota constante que cubra el plazo pedido exactamente.
+                mensaje += ` Con este importe no es posible estirarlo a ${plan.mesesSolicitados} meses: la cuota mínima lo liquida antes.`;
+            }
+            textoEstimacion.textContent = mensaje;
+            return;
+        }
+
+        const cuotaCent = aCentimos(this.valorCampo('campo-deuda-cuota'));
+        if (cuotaCent <= 0) {
+            textoEstimacion.textContent = 'Indica el total adeudado y la cuota para estimar los meses de pago.';
+            return;
+        }
+
+        const meses = Math.ceil(totalCent / cuotaCent);
+        const ultimaCuotaCent = totalCent - cuotaCent * (meses - 1);
+        let mensaje = `A este ritmo liquidarás la deuda en ${this.gestor.describirPlazoEnMeses(meses)} (${formatearEuros(cuotaCent)} / mes).`;
+        if (ultimaCuotaCent > 0 && ultimaCuotaCent !== cuotaCent) {
+            mensaje += ` La última cuota será de ${formatearEuros(ultimaCuotaCent)}.`;
+        }
+        textoEstimacion.textContent = mensaje;
+    }
+
+    /** Lee el valor de un campo del formulario sin fallar si no existe. */
+    valorCampo(id) {
+        const elemento = this.obtener(id);
+        return elemento ? elemento.value : '';
+    }
+
+    abrirModalDeuda(idDeuda = null) {
+        const modal = this.obtener('modal-deuda');
+        this.idDeudaEnEdicion = idDeuda;
+
+        const titulo = this.obtener('titulo-modal-deuda');
+        const campoConcepto = this.obtener('campo-deuda-concepto');
+        const campoTotal = this.obtener('campo-deuda-total');
+        const campoCuota = this.obtener('campo-deuda-cuota');
+        const campoCanal = this.obtener('campo-deuda-canal');
+        const campoNotas = this.obtener('campo-deuda-notas');
+        const textoEstimacion = this.obtener('texto-estimacion-deuda');
+
+        const deuda = idDeuda ? this.gestor.obtenerDeudaPorId(idDeuda) : null;
+
+        const campoModo = this.obtener('campo-deuda-modo');
+        const campoPlazoValor = this.obtener('campo-deuda-plazo-valor');
+        const campoPlazoUnidad = this.obtener('campo-deuda-plazo-unidad');
+
+        if (deuda) {
+            if (titulo) titulo.textContent = 'Editar deuda u obligación';
+            if (campoConcepto) campoConcepto.value = deuda.concepto;
+            if (campoTotal) campoTotal.value = formatearParaEntrada(deuda.importeTotalCent);
+            if (campoCuota) campoCuota.value = formatearParaEntrada(deuda.cuotaMensualCent);
+            if (campoCanal) campoCanal.value = deuda.canal;
+            if (campoNotas) campoNotas.value = deuda.notas || '';
+
+            // Se reabre en el mismo modo con el que se definió la deuda
+            if (campoModo) campoModo.value = deuda.modoDefinicion === 'PLAZO' ? 'PLAZO' : 'CUOTA';
+            if (campoPlazoValor) {
+                campoPlazoValor.value = deuda.plazo
+                    ? String(deuda.plazo.valor).replace('.', ',')
+                    : String(this.gestor.calcularMesesRestantesDeuda(deuda) || '');
+            }
+            if (campoPlazoUnidad) campoPlazoUnidad.value = deuda.plazo ? deuda.plazo.unidad : 'MESES';
+        } else {
+            if (titulo) titulo.textContent = 'Añadir deuda u obligación';
+            if (campoConcepto) campoConcepto.value = '';
+            if (campoTotal) campoTotal.value = '';
+            if (campoCuota) campoCuota.value = '';
+            if (campoCanal) campoCanal.value = CANALES_PAGO.CUENTA;
+            if (campoNotas) campoNotas.value = '';
+            if (campoModo) campoModo.value = 'CUOTA';
+            if (campoPlazoValor) campoPlazoValor.value = '';
+            if (campoPlazoUnidad) campoPlazoUnidad.value = 'MESES';
+            if (textoEstimacion) {
+                textoEstimacion.textContent = 'Indica el total adeudado y la cuota para estimar los meses de pago.';
+            }
+        }
+
+        if (typeof this.aplicarModoDeuda === 'function') this.aplicarModoDeuda();
+
+        this.abrirModal(modal);
+    }
+
+    guardarDeudaDesdeFormulario(formulario) {
+        const concepto = formulario.concepto.value.trim();
+        const importeTotalCent = aCentimos(formulario.importeTotal.value);
+        const modoDefinicion = formulario.modoDefinicion.value === 'PLAZO' ? 'PLAZO' : 'CUOTA';
+
+        if (!concepto) {
+            this.mostrarAviso('Escribe un concepto o acreedor para la deuda.', 'error');
+            formulario.concepto.focus();
+            return false;
+        }
+        if (importeTotalCent <= 0) {
+            this.mostrarAviso('El total adeudado debe ser mayor que 0 €.', 'error');
+            formulario.importeTotal.focus();
+            return false;
+        }
+
+        const datos = {
+            concepto,
+            importeTotalCent,
+            modoDefinicion,
+            canal: formulario.canal.value,
+            notas: formulario.notas.value.trim()
+        };
+
+        if (modoDefinicion === 'PLAZO') {
+            const plazoValor = formulario.plazoValor.value;
+            const plazoUnidad = formulario.plazoUnidad.value;
+
+            if (aCentimos(plazoValor) <= 0) {
+                this.mostrarAviso('Indica cuánto durará la deuda (en días, meses o años).', 'error');
+                formulario.plazoValor.focus();
+                return false;
+            }
+
+            datos.plazo = { valor: plazoValor, unidad: plazoUnidad };
+            // La cuota la deriva el gestor a partir del plazo
+            const plan = this.gestor.planificarDeudaPorPlazo(importeTotalCent, plazoValor, plazoUnidad);
+            datos.cuotaMensualCent = plan.cuotaMensualCent;
+        } else {
+            const cuotaMensualCent = aCentimos(formulario.cuotaMensual.value);
+            if (cuotaMensualCent <= 0) {
+                this.mostrarAviso('La cuota mensual debe ser mayor que 0 €.', 'error');
+                formulario.cuotaMensual.focus();
+                return false;
+            }
+            datos.cuotaMensualCent = cuotaMensualCent;
+            datos.plazo = null;
+        }
+
+        if (this.idDeudaEnEdicion) {
+            this.gestor.actualizarDeuda(this.idDeudaEnEdicion, datos);
+            this.mostrarAviso('Deuda actualizada correctamente.', 'exito');
+        } else {
+            this.gestor.agregarDeuda(datos);
+            this.mostrarAviso('Deuda registrada e incorporada al presupuesto.', 'exito');
+        }
+
+        this.actualizarVistaCompleta();
+        return true;
+    }
+
+    configurarModalAmortizar() {
+        const modal = this.obtener('modal-amortizar');
+        const formulario = this.obtener('formulario-amortizar');
+        const campoImporte = this.obtener('campo-amortizar-importe');
+        const textoResultado = this.obtener('texto-resultado-amortizar');
+
+        const cerrar = () => {
+            this.cerrarModal(modal);
+            this.idDeudaEnAmortizacion = null;
+        };
+
+        const botonCerrar = this.obtener('boton-cerrar-modal-amortizar');
+        const botonCancelar = this.obtener('boton-cancelar-modal-amortizar');
+        if (botonCerrar) botonCerrar.addEventListener('click', cerrar);
+        if (botonCancelar) botonCancelar.addEventListener('click', cerrar);
+
+        if (modal) {
+            modal.addEventListener('mousedown', evento => {
+                if (evento.target === modal) cerrar();
+            });
+        }
+
+        if (campoImporte) {
+            campoImporte.addEventListener('input', () => {
+                if (!this.idDeudaEnAmortizacion || !textoResultado) return;
+                const deuda = this.gestor.obtenerDeudaPorId(this.idDeudaEnAmortizacion);
+                if (!deuda) return;
+
+                const abonoCent = aCentimos(campoImporte.value);
+                if (abonoCent <= 0) {
+                    textoResultado.textContent = 'Introduce la cantidad para ver el saldo restante y los meses ahorrados.';
+                    return;
+                }
+
+                const nuevoSaldoCent = Math.max(0, deuda.importeTotalCent - abonoCent);
+                const mesesNuevos = nuevoSaldoCent > 0 && deuda.cuotaMensualCent > 0
+                    ? Math.ceil(nuevoSaldoCent / deuda.cuotaMensualCent)
+                    : 0;
+                const mesesPrevios = this.gestor.calcularMesesRestantesDeuda(deuda);
+                const ahorroMeses = Math.max(0, mesesPrevios - mesesNuevos);
+
+                if (nuevoSaldoCent === 0) {
+                    textoResultado.textContent = '¡Excelente! Con este abono la deuda quedará totalmente liquidada.';
+                } else {
+                    textoResultado.textContent = `Nuevo saldo: ${formatearEuros(nuevoSaldoCent)} · Quedarán ${mesesNuevos} ${mesesNuevos === 1 ? 'mes' : 'meses'} (ahorras ${ahorroMeses} ${ahorroMeses === 1 ? 'mes' : 'meses'}).`;
+                }
+            });
+        }
+
+        if (formulario) {
+            formulario.addEventListener('submit', evento => {
+                evento.preventDefault();
+                if (this.guardarAmortizacionDesdeFormulario(formulario)) cerrar();
+            });
+        }
+    }
+
+    abrirModalAmortizar(idDeuda) {
+        const modal = this.obtener('modal-amortizar');
+        const deuda = this.gestor.obtenerDeudaPorId(idDeuda);
+        if (!deuda) return;
+
+        this.idDeudaEnAmortizacion = idDeuda;
+
+        const descripcionConcepto = this.obtener('descripcion-amortizar-concepto');
+        const saldoActual = this.obtener('amortizar-saldo-actual');
+        const cuotaActual = this.obtener('amortizar-cuota-actual');
+        const campoImporte = this.obtener('campo-amortizar-importe');
+        const textoResultado = this.obtener('texto-resultado-amortizar');
+
+        if (descripcionConcepto) {
+            descripcionConcepto.textContent = `Abono extraordinario para reducir el saldo pendiente de ${deuda.concepto}.`;
+        }
+        if (saldoActual) saldoActual.textContent = formatearEuros(deuda.importeTotalCent);
+        if (cuotaActual) cuotaActual.textContent = `${formatearEuros(deuda.cuotaMensualCent)} / mes`;
+        if (campoImporte) campoImporte.value = '';
+        if (textoResultado) {
+            textoResultado.textContent = 'Introduce la cantidad para ver el saldo restante y los meses ahorrados.';
+        }
+
+        this.abrirModal(modal);
+    }
+
+    guardarAmortizacionDesdeFormulario(formulario) {
+        const importeCent = aCentimos(formulario.importeAmortizar.value);
+        if (importeCent <= 0) {
+            this.mostrarAviso('Introduce una cantidad válida a amortizar.', 'error');
+            formulario.importeAmortizar.focus();
+            return false;
+        }
+
+        if (!this.idDeudaEnAmortizacion) return false;
+
+        const deuda = this.gestor.amortizarDeuda(this.idDeudaEnAmortizacion, importeCent);
+        if (deuda) {
+            if (deuda.pagada) {
+                this.mostrarAviso(`¡Enhorabuena! Has liquidado por completo "${deuda.concepto}".`, 'exito');
+            } else {
+                this.mostrarAviso(`Amortización de ${formatearEuros(importeCent)} registrada con éxito.`, 'exito');
+            }
+            this.actualizarVistaCompleta();
+            return true;
+        }
+        return false;
+    }
+
     configurarModalConfirmacion() {
         this.obtener('boton-aceptar-confirmacion').addEventListener('click', () => this.cerrarConfirmacion(true));
         this.obtener('boton-cancelar-confirmacion').addEventListener('click', () => this.cerrarConfirmacion(false));
@@ -816,6 +1269,13 @@ export class ControladorInterfaz {
 
                 const lector = new FileReader();
                 lector.onload = eventoLectura => {
+                    try {
+                        const estadoPrevio = this.gestor.exportarCopiaSeguridadJSON();
+                        localStorage.setItem('presupuesto_personal_respaldo_previo', estadoPrevio);
+                    } catch (errorRespaldo) {
+                        console.warn('Aviso: no se pudo guardar copia preventiva previa:', errorRespaldo);
+                    }
+
                     const resultado = this.gestor.importarCopiaSeguridadJSON(eventoLectura.target.result);
                     this.mostrarAviso(resultado.mensaje, resultado.exito ? 'exito' : 'error');
                     if (resultado.exito) {
@@ -857,10 +1317,13 @@ export class ControladorInterfaz {
         const resumen = this.gestor.calcularResumenMes(mes);
 
         this.renderizarMetricas(resumen);
+        this.renderizarAtencion(resumen);
         this.renderizarAvisoDidactico(resumen);
         this.renderizarDistribucion(resumen);
         this.renderizarEstrategia(resumen);
         this.renderizarTablaPartidas();
+        this.renderizarDeudas();
+        this.renderizarCargaDeuda(resumen);
         this.renderizarCanales(resumen);
         this.renderizarProyeccion();
         this.renderizarSobres();
@@ -880,6 +1343,20 @@ export class ControladorInterfaz {
             const elemento = this.obtener(id);
             if (elemento) elemento.textContent = texto;
         };
+
+        // Métrica destacada: "¿Cuánto dinero te queda este mes?"
+        const restanteConsumoCent = Math.max(0, resumen.ingresoCent - resumen.consumoCent);
+        asignar('metrica-disponible', formatearEuros(restanteConsumoCent));
+        const detalleDisponible = this.obtener('detalle-disponible');
+        if (detalleDisponible) {
+            if (resumen.ingresoCent <= 0) {
+                detalleDisponible.textContent = 'Configura tus ingresos para ver tu saldo';
+            } else if (resumen.balanceNetoCent < 0) {
+                detalleDisponible.textContent = 'Atención: déficit presupuestario este mes';
+            } else {
+                detalleDisponible.textContent = `Quedan ${formatearEuros(resumen.balanceNetoCent)} libres tras ahorro e inversión`;
+            }
+        }
 
         asignar('metrica-ingreso', formatearEuros(resumen.ingresoCent));
         asignar('metrica-cuenta', formatearEuros(resumen.cuentaCent));
@@ -932,6 +1409,296 @@ export class ControladorInterfaz {
         }
 
         this.renderizarInsigniaEstado(resumen);
+    }
+
+    renderizarAtencion(resumen) {
+        const contenedor = this.obtener('bloque-atencion');
+        const lista = this.obtener('lista-atencion');
+        if (!contenedor || !lista) return;
+
+        const alertas = [];
+        const seguimientoSobres = this.gestor.obtenerSeguimientoSobres(resumen.numeroMes);
+
+        // 1. Sobregasto o alerta en sobres
+        Object.values(seguimientoSobres).forEach(sobre => {
+            if (sobre.estadoSobre === 'sobregasto') {
+                alertas.push({
+                    tipo: 'peligro',
+                    icono: 'alert-triangle',
+                    titulo: `Presupuesto superado en ${this.escapar(sobre.configuracion.nombreCorto)}`,
+                    mensaje: `Has superado este límite en <strong>${formatearEuros(-sobre.disponibleCent)}</strong> sobre los ${formatearEuros(sobre.limitePresupuestadoCent)} asignados.`,
+                    accionTexto: 'Ver sobre',
+                    pestanaDestino: 'panel-lugares'
+                });
+            } else if (sobre.estadoSobre === 'alerta') {
+                alertas.push({
+                    tipo: 'aviso',
+                    icono: 'alert-circle',
+                    titulo: `Cerca del límite en ${this.escapar(sobre.configuracion.nombreCorto)}`,
+                    mensaje: `Has consumido el <strong>${sobre.porcentajeConsumido} %</strong>. Te quedan <strong>${formatearEuros(sobre.disponibleCent)}</strong> disponibles este mes.`,
+                    accionTexto: 'Ver sobre',
+                    pestanaDestino: 'panel-lugares'
+                });
+            }
+        });
+
+        // 2. Compromisos de deuda activos
+        const deudasActivas = this.gestor.obtenerDeudasActivas();
+        if (deudasActivas.length > 0 && resumen.deudasCent > 0) {
+            alertas.push({
+                tipo: 'info',
+                icono: 'credit-card',
+                titulo: `Compromisos de deuda este mes (${deudasActivas.length})`,
+                mensaje: `Se destinan <strong>${formatearEuros(resumen.deudasCent)}</strong> a cuotas mensuales de amortización.`,
+                accionTexto: 'Ver deudas',
+                pestanaDestino: 'panel-deudas'
+            });
+        }
+
+        // 3. Déficit de presupuesto
+        if (resumen.balanceNetoCent < 0) {
+            alertas.push({
+                tipo: 'peligro',
+                icono: 'trending-down',
+                titulo: 'Déficit presupuestario',
+                mensaje: `Tus gastos y reservas superan tus ingresos por <strong>${formatearEuros(-resumen.balanceNetoCent)}</strong>. Ajusta o elimina partidas.`,
+                accionTexto: 'Ver presupuesto',
+                pestanaDestino: 'panel-gastos'
+            });
+        }
+
+        if (alertas.length === 0) {
+            contenedor.classList.add('oculto');
+            lista.innerHTML = '';
+            return;
+        }
+
+        contenedor.classList.remove('oculto');
+        lista.innerHTML = alertas.map(alerta => `
+            <div class="tarjeta-alerta-atencion tarjeta-alerta-atencion--${alerta.tipo}">
+                <div class="icono-alerta-atencion" aria-hidden="true">
+                    <i data-lucide="${alerta.icono}"></i>
+                </div>
+                <div class="cuerpo-alerta-atencion">
+                    <h4 class="titulo-alerta-atencion">${alerta.titulo}</h4>
+                    <p class="mensaje-alerta-atencion">${alerta.mensaje}</p>
+                </div>
+                ${alerta.pestanaDestino ? `
+                    <button type="button" class="boton-enlace-alerta" data-pestana="${alerta.pestanaDestino}">
+                        ${this.escapar(alerta.accionTexto)} →
+                    </button>
+                ` : ''}
+            </div>
+        `).join('');
+
+        lista.querySelectorAll('[data-pestana]').forEach(boton => {
+            boton.addEventListener('click', () => this.cambiarPestana(boton.getAttribute('data-pestana')));
+        });
+        this.actualizarIconos();
+    }
+
+    renderizarDeudas() {
+        const kpiTotal = this.obtener('kpi-deuda-total');
+        const kpiCuota = this.obtener('kpi-deuda-cuota');
+        const kpiTiempo = this.obtener('kpi-deuda-tiempo');
+        const kpiAmortizado = this.obtener('kpi-deuda-amortizado');
+        const kpiCuentas = this.obtener('kpi-deuda-cuentas');
+        const kpiFechaFin = this.obtener('kpi-deuda-fecha-fin');
+        const rejilla = this.obtener('rejilla-tarjetas-deuda');
+
+        const deudasActivas = this.gestor.obtenerDeudasActivas();
+        const totalPendienteCent = this.gestor.calcularTotalDeudaPendienteCent();
+        const cuotaTotalCent = this.gestor.calcularCuotaMensualTotalDeudasCent();
+        const mesesLibertad = this.gestor.calcularMesesParaLibertadDeDeudas();
+        const totalAmortizadoCent = this.gestor.deudas.reduce((total, d) => total + (d.totalAmortizadoCent || 0), 0);
+
+        if (kpiTotal) kpiTotal.textContent = formatearEuros(totalPendienteCent);
+        if (kpiCuota) kpiCuota.textContent = formatearEuros(cuotaTotalCent);
+        if (kpiTiempo) kpiTiempo.textContent = `${mesesLibertad} ${mesesLibertad === 1 ? 'mes' : 'meses'}`;
+        if (kpiAmortizado) kpiAmortizado.textContent = formatearEuros(totalAmortizadoCent);
+        if (kpiCuentas) {
+            kpiCuentas.textContent = `${deudasActivas.length} ${deudasActivas.length === 1 ? 'deuda activa' : 'deudas activas'}`;
+        }
+        if (kpiFechaFin) {
+            kpiFechaFin.textContent = deudasActivas.length > 0 ? `Fin estimado: Mes ${mesesLibertad}` : 'Sin deudas';
+        }
+
+        if (!rejilla) return;
+
+        if (this.gestor.deudas.length === 0) {
+            rejilla.innerHTML = `
+                <div class="tarjeta-vacia-deudas">
+                    <div class="icono-vacio-deuda" aria-hidden="true"><i data-lucide="shield-check"></i></div>
+                    <h3>No tienes deudas registradas</h3>
+                    <p>Si tienes préstamos, tarjetas o compras aplazadas, regístralas para que sus cuotas se descuenten de tu presupuesto mensual y se calcule en qué mes quedarás libre de deudas.</p>
+                    <button type="button" class="boton boton--primario" id="boton-deuda-vacia">
+                        <i data-lucide="plus-circle" aria-hidden="true"></i>
+                        Añadir primera deuda
+                    </button>
+                </div>
+            `;
+            const botonVacia = this.obtener('boton-deuda-vacia');
+            if (botonVacia) botonVacia.addEventListener('click', () => this.abrirModalDeuda());
+            return;
+        }
+
+        rejilla.innerHTML = this.gestor.deudas.map(deuda => {
+            const totalOriginalCent = deuda.importeTotalCent + (deuda.totalAmortizadoCent || 0);
+            const porcentajeAmortizado = totalOriginalCent > 0
+                ? calcularPorcentaje(deuda.totalAmortizadoCent || 0, totalOriginalCent, 0)
+                : 100;
+            const mesesRestantes = this.gestor.calcularMesesRestantesDeuda(deuda);
+            const esBanco = deuda.canal === CANALES_PAGO.CUENTA;
+
+            return `
+                <article class="tarjeta-deuda ${deuda.pagada ? 'tarjeta-deuda--pagada' : ''}" data-id-deuda="${this.escapar(deuda.id)}">
+                    <div class="cabecera-tarjeta-deuda">
+                        <div class="identidad-deuda">
+                            <h3 class="titulo-deuda">${this.escapar(deuda.concepto)}</h3>
+                            <div class="insignias-deuda">
+                                <span class="insignia-canal ${esBanco ? 'insignia-canal--banco' : 'insignia-canal--efectivo'}">
+                                    <i data-lucide="${esBanco ? 'landmark' : 'banknote'}" aria-hidden="true"></i>
+                                    ${this.escapar(deuda.canal)}
+                                </span>
+                                ${deuda.pagada ? '<span class="insignia insignia--exito"><i data-lucide="check" aria-hidden="true"></i> Liquidada</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="acciones-tarjeta-deuda">
+                            ${!deuda.pagada ? `
+                                <button type="button" class="boton-icono boton-icono--amortizar" title="Amortizar o abonar capital" data-accion="amortizar-deuda" data-id="${this.escapar(deuda.id)}" aria-label="Amortizar ${this.escapar(deuda.concepto)}">
+                                    <i data-lucide="sparkles" aria-hidden="true"></i>
+                                </button>
+                            ` : ''}
+                            <button type="button" class="boton-icono" title="Editar deuda" data-accion="editar-deuda" data-id="${this.escapar(deuda.id)}" aria-label="Editar ${this.escapar(deuda.concepto)}">
+                                <i data-lucide="pencil" aria-hidden="true"></i>
+                            </button>
+                            <button type="button" class="boton-icono boton-icono--peligro" title="Eliminar deuda" data-accion="eliminar-deuda" data-id="${this.escapar(deuda.id)}" aria-label="Eliminar ${this.escapar(deuda.concepto)}">
+                                <i data-lucide="trash-2" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="cifras-tarjeta-deuda">
+                        <div class="cifra-deuda-bloque">
+                            <span class="etiqueta-cifra-deuda">Pendiente</span>
+                            <strong class="valor-cifra-deuda ${deuda.pagada ? 'valor-cifra-deuda--cero' : 'valor-cifra-deuda--pendiente'}">
+                                ${formatearEuros(deuda.importeTotalCent)}
+                            </strong>
+                        </div>
+                        <div class="cifra-deuda-bloque">
+                            <span class="etiqueta-cifra-deuda">Cuota mensual</span>
+                            <strong class="valor-cifra-deuda">${formatearEuros(deuda.cuotaMensualCent)} / mes</strong>
+                        </div>
+                        <div class="cifra-deuda-bloque">
+                            <span class="etiqueta-cifra-deuda">Tiempo restante</span>
+                            <strong class="valor-cifra-deuda">${deuda.pagada ? 'Liquidada' : this.escapar(this.gestor.describirPlazoEnMeses(mesesRestantes))}</strong>
+                            ${!deuda.pagada && mesesRestantes >= 12 ? `<span class="detalle-cifra-deuda">${mesesRestantes} cuotas</span>` : ''}
+                        </div>
+                    </div>
+
+                    <div class="progreso-amortizacion">
+                        <div class="barra-progreso-amortizacion" role="progressbar" aria-valuenow="${porcentajeAmortizado}" aria-valuemin="0" aria-valuemax="100" data-ancho="${porcentajeAmortizado}"></div>
+                    </div>
+                    <div class="pie-progreso-amortizacion">
+                        <span>Amortizado: <strong>${formatearEuros(deuda.totalAmortizadoCent || 0)}</strong> (${porcentajeAmortizado} %)</span>
+                        ${deuda.notas ? `<span class="notas-deuda-texto" title="${this.escapar(deuda.notas)}">${this.escapar(deuda.notas)}</span>` : ''}
+                    </div>
+                </article>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Muestra qué parte del sueldo se destina a pagar deudas.
+     * El estado se comunica con texto y símbolo además de con color, para que
+     * la información no dependa únicamente de la vista cromática.
+     */
+    renderizarCargaDeuda(resumen) {
+        const bloque = this.obtener('bloque-carga-deuda');
+        if (!bloque) return;
+
+        const carga = resumen.cargaDeuda;
+        const hayDatos = carga.ingresoCent > 0 && carga.cuotaDeudaCent > 0;
+
+        // Sin ingresos o sin cuotas no hay ninguna proporción que mostrar
+        bloque.classList.toggle('oculto', !hayDatos);
+
+        const subtituloCuota = this.obtener('kpi-deuda-porcentaje');
+        if (subtituloCuota) {
+            subtituloCuota.textContent = hayDatos
+                ? `${formatearPorcentaje(carga.porcentaje)} de tus ingresos del mes`
+                : 'Descontada de tu presupuesto';
+        }
+
+        if (!hayDatos) return;
+
+        bloque.className = `tarjeta bloque-carga-deuda bloque-carga-deuda--${carga.nivel}`;
+
+        const porcentajeTexto = this.obtener('porcentaje-carga-deuda');
+        if (porcentajeTexto) porcentajeTexto.textContent = formatearPorcentaje(carga.porcentaje);
+
+        const estado = this.obtener('estado-carga-deuda');
+        if (estado) {
+            const clasesPorNivel = {
+                holgado: 'insignia--exito',
+                razonable: 'insignia--info',
+                ajustado: 'insignia--aviso',
+                elevado: 'insignia--peligro'
+            };
+            estado.className = `insignia ${clasesPorNivel[carga.nivel] || ''}`.trim();
+            estado.textContent = `${carga.simbolo} ${carga.etiqueta}`;
+        }
+
+        const frase = this.obtener('frase-carga-deuda');
+        if (frase) {
+            frase.innerHTML = `De cada 100 € que ingresas, <strong>${formatearEuros(carga.euroPorCada100Cent)}</strong> se van en pagar deudas. ${this.escapar(carga.resumen)}`;
+        }
+
+        const relleno = this.obtener('relleno-carga-deuda');
+        if (relleno) {
+            // El ancho lo aplica aplicarEstilosDinamicos(): así hay una única
+            // fuente de verdad y no se pisan el atributo y el estilo calculado.
+            relleno.setAttribute('data-ancho', String(carga.porcentaje));
+            relleno.setAttribute('aria-valuenow', String(carga.porcentaje));
+            relleno.setAttribute('aria-valuetext',
+                `${formatearPorcentaje(carga.porcentaje)} de tus ingresos: ${carga.etiqueta}`);
+        }
+
+        const marca = this.obtener('marca-referencia-deuda');
+        if (marca) marca.style.left = `${carga.limiteRecomendado}%`;
+
+        const textoReferencia = this.obtener('texto-referencia-deuda');
+        if (textoReferencia) {
+            textoReferencia.textContent = `Referencia: ${carga.limiteRecomendado} %`;
+        }
+
+        const cuotas = this.obtener('carga-deuda-cuotas');
+        if (cuotas) cuotas.textContent = formatearEuros(carga.cuotaDeudaCent);
+
+        const libre = this.obtener('carga-deuda-libre');
+        if (libre) libre.textContent = formatearEuros(carga.ingresoLibreCent);
+
+        // El tercer dato cambia de significado según se supere o no la referencia
+        const margenEtiqueta = this.obtener('carga-deuda-margen-etiqueta');
+        const margen = this.obtener('carga-deuda-margen');
+        if (margenEtiqueta && margen) {
+            if (carga.superaReferencia) {
+                margenEtiqueta.textContent = `Exceso sobre el ${carga.limiteRecomendado} %`;
+                margen.textContent = formatearEuros(carga.excesoSobreReferenciaCent);
+            } else {
+                margenEtiqueta.textContent = `Margen hasta el ${carga.limiteRecomendado} %`;
+                margen.textContent = formatearEuros(carga.margenHastaReferenciaCent);
+            }
+        }
+
+        const consejo = this.obtener('consejo-carga-deuda');
+        if (consejo) {
+            const mesAlivio = this.gestor.calcularMesAlivioCargaDeuda(carga.numeroMes);
+            const notaAlivio = mesAlivio
+                ? ` Si mantienes el plan actual, en el mes ${mesAlivio} bajarás de la referencia del ${carga.limiteRecomendado} %.`
+                : '';
+            consejo.textContent = `${carga.consejo}${notaAlivio}`;
+        }
     }
 
     renderizarInsigniaEstado(resumen) {
@@ -1035,7 +1802,7 @@ export class ControladorInterfaz {
             const anchoVisual = (totalCent / referenciaCent) * 100;
             const porcentajeReal = calcularPorcentaje(totalCent, resumen.ingresoCent, 1);
             return `<span class="segmento-barra"
-                          style="width: ${anchoVisual}%; background-color: ${config.color};"
+                          data-ancho="${anchoVisual}" data-fondo="${config.color}"
                           title="${this.escapar(config.nombre)}: ${formatearEuros(totalCent)} (${formatearPorcentaje(porcentajeReal)})"></span>`;
         }).join('');
 
@@ -1044,7 +1811,7 @@ export class ControladorInterfaz {
             const porcentajeReal = calcularPorcentaje(totalCent, resumen.ingresoCent, 1);
             return `
                 <span class="item-leyenda">
-                    <span class="punto-leyenda" style="background-color: ${config.color};"></span>
+                    <span class="punto-leyenda" data-fondo="${config.color}"></span>
                     <span>${this.escapar(config.nombreCorto)}: <strong>${formatearEuros(totalCent)}</strong></span>
                     <span class="porcentaje-leyenda">${formatearPorcentaje(porcentajeReal)}</span>
                 </span>
@@ -1109,7 +1876,7 @@ export class ControladorInterfaz {
                         </span>
                     </td>
                     <td data-etiqueta="Categoría">
-                        <span class="insignia-categoria" style="--color-categoria: ${config.color};">
+                        <span class="insignia-categoria" data-color-categoria="${config.color}">
                             <i data-lucide="${config.icono}" aria-hidden="true"></i>
                             ${this.escapar(config.nombreCorto)}
                         </span>
@@ -1183,7 +1950,7 @@ export class ControladorInterfaz {
                 <article class="tarjeta-sobre tarjeta-sobre--${sobre.estadoSobre}">
                     <div class="cabecera-sobre">
                         <h3 class="nombre-sobre">
-                            <i data-lucide="${config.icono}" style="color: ${config.color};" aria-hidden="true"></i>
+                            <span data-color="${config.color}" aria-hidden="true"><i data-lucide="${config.icono}"></i></span>
                             ${this.escapar(config.nombreCorto)}
                         </h3>
                         <span class="insignia ${claseInsignia}">${textosEstado[sobre.estadoSobre]}</span>
@@ -1195,7 +1962,7 @@ export class ControladorInterfaz {
                     </div>
 
                     <div class="barra-sobre">
-                        <div class="relleno-sobre" style="width: ${anchoBarra}%;"></div>
+                        <div class="relleno-sobre" data-ancho="${anchoBarra}"></div>
                     </div>
 
                     <div class="detalle-sobre">
@@ -1258,7 +2025,7 @@ export class ControladorInterfaz {
                         </span>
                     </td>
                     <td data-etiqueta="Categoría">
-                        <span class="insignia-categoria" style="--color-categoria: ${config.color};">
+                        <span class="insignia-categoria" data-color-categoria="${config.color}">
                             ${this.escapar(config.nombreCorto)}
                         </span>
                     </td>
@@ -1623,6 +2390,39 @@ export class ControladorInterfaz {
                     }
                 }
             });
+        }
+
+        this.actualizarResumenesAccesiblesGraficos(resumen, proyeccion);
+    }
+
+    actualizarResumenesAccesiblesGraficos(resumen, proyeccion) {
+        const elementoCategorias = this.obtener('resumen-grafico-categorias');
+        if (elementoCategorias) {
+            const entradasCategorias = Object.entries(resumen.desglosePorCategoriaCent).filter(([, total]) => total > 0);
+            if (entradasCategorias.length === 0) {
+                elementoCategorias.textContent = 'Sin gastos asignados a categorías este mes.';
+            } else {
+                const totalConsumo = resumen.consumoCent;
+                const fragmentos = entradasCategorias.map(([clave, total]) => {
+                    const porcentaje = totalConsumo > 0 ? Math.round((total / totalConsumo) * 100) : 0;
+                    const categoria = CATEGORIAS_GASTO[clave];
+                    const etiqueta = categoria ? categoria.nombre : clave;
+                    return `${etiqueta}: ${formatearEuros(total)} (${porcentaje} %)`;
+                });
+                elementoCategorias.textContent = `Distribución del gasto: ${fragmentos.join(', ')}.`;
+            }
+        }
+
+        const elementoCanales = this.obtener('resumen-grafico-canales');
+        if (elementoCanales) {
+            elementoCanales.textContent = `Comparativa bicanal del Mes ${this.gestor.mesVisualizado}: En cuenta bancaria ingresado ${formatearEuros(resumen.ingresoCuentaCent)} y comprometido ${formatearEuros(resumen.cuentaCent)} (saldo restante: ${formatearEuros(resumen.saldoCuentaRestanteCent, { conSigno: true })}). En efectivo físico ingresado ${formatearEuros(resumen.ingresoFisicoCent)} y comprometido ${formatearEuros(resumen.fisicoCent)} (saldo restante: ${formatearEuros(resumen.saldoFisicoRestanteCent, { conSigno: true })}).`;
+        }
+
+        const elementoPatrimonio = this.obtener('resumen-grafico-patrimonio');
+        if (elementoPatrimonio && proyeccion && proyeccion.length > 0) {
+            const primerMes = proyeccion[0];
+            const ultimoMes = proyeccion[proyeccion.length - 1];
+            elementoPatrimonio.textContent = `Proyección patrimonial a ${proyeccion.length} meses: Comienza en ${formatearEuros(primerMes.patrimonioTotalCent)} en el Mes 1 y alcanza ${formatearEuros(ultimoMes.patrimonioTotalCent)} en el Mes ${proyeccion.length} (ahorro total: ${formatearEuros(ultimoMes.ahorroAcumuladoCent)}, inversión total: ${formatearEuros(ultimoMes.inversionAcumuladaCent)}).`;
         }
     }
 
