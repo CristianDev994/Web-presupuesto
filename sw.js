@@ -5,7 +5,7 @@
 // navegador reinstala el Service Worker, precarga los recursos nuevos y borra
 // las cachés anteriores; si no cambia, los visitantes que ya entraron seguirían
 // viendo indefinidamente la versión vieja guardada en su navegador.
-const VERSION_CACHE = 'v3';
+const VERSION_CACHE = 'v4';
 const NOMBRE_CACHE = `presupuesto-cache-${VERSION_CACHE}`;
 
 const RECURSOS_LOCALES = [

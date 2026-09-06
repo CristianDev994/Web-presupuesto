@@ -249,6 +249,30 @@ input[type="number"] {
     appearance: textfield;
 }
 
+/* Enlace para saltar al contenido: oculto hasta que recibe el foco del
+   teclado, momento en el que aparece sobre el resto de la interfaz. */
+.enlace-saltar {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    z-index: 200;
+    padding: var(--espacio-3) var(--espacio-4);
+    border: 1px solid var(--borde-fuerte);
+    border-radius: 0 0 var(--radio-md) var(--radio-md);
+    background: var(--superficie-solida);
+    color: var(--texto);
+    font-size: var(--texto-sm);
+    font-weight: 700;
+    box-shadow: var(--sombra-lg);
+    transform: translate(-50%, -120%);
+    transition: transform var(--transicion);
+}
+
+.enlace-saltar:focus-visible,
+.enlace-saltar:focus {
+    transform: translate(-50%, 0);
+}
+
 /* Utilidad: contenido solo para lectores de pantalla */
 .solo-lectores {
     position: absolute;
